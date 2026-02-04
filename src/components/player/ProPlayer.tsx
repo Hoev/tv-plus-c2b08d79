@@ -263,10 +263,7 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
     return null;
   };
 
-  // Default User-Agent for better compatibility
-  const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-  // Shaka Player with enhanced network handling
+  // Shaka Player
   const initShaka = async () => {
     if (!videoRef.current) return;
     if (typeof shaka === 'undefined') {
@@ -278,85 +275,11 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
       setError('Browser not supported');
       return;
     }
-    
     const shakaPlayer = new shaka.Player(videoRef.current);
     
-    // Enhanced configuration for maximum compatibility
     shakaPlayer.configure({
-      abr: { 
-        enabled: true,
-        defaultBandwidthEstimate: 1000000, // 1 Mbps default
-        switchInterval: 8,
-        bandwidthUpgradeTarget: 0.85,
-        bandwidthDowngradeTarget: 0.95,
-      },
-      streaming: { 
-        bufferingGoal: 30,
-        rebufferingGoal: 5, 
-        bufferBehind: 60,
-        retryParameters: {
-          maxAttempts: 5,
-          baseDelay: 1000,
-          backoffFactor: 2,
-          fuzzFactor: 0.5,
-          timeout: 30000,
-        },
-        failureCallback: (error: any) => {
-          console.error('[Shaka] Streaming failure:', error);
-        },
-        lowLatencyMode: false,
-        autoLowLatencyMode: true,
-        forceHTTP: false,
-        forceHTTPS: false,
-        ignoreTextStreamFailures: true,
-        alwaysStreamText: false,
-        startAtSegmentBoundary: false,
-        gapDetectionThreshold: 0.5,
-        durationBackoff: 1,
-        safeSeekOffset: 5,
-        stallEnabled: true,
-        stallThreshold: 1,
-        stallSkip: 0.1,
-        useNativeHlsOnSafari: false,
-      },
-      manifest: {
-        retryParameters: {
-          maxAttempts: 5,
-          baseDelay: 1000,
-          backoffFactor: 2,
-          fuzzFactor: 0.5,
-          timeout: 30000,
-        },
-        availabilityWindowOverride: NaN,
-        disableAudio: false,
-        disableVideo: false,
-        disableText: false,
-        dash: {
-          ignoreMinBufferTime: true,
-          autoCorrectDrift: true,
-          xlinkFailGracefully: true,
-          ignoreEmptyAdaptationSet: true,
-        },
-        hls: {
-          ignoreTextStreamFailures: true,
-          ignoreImageStreamFailures: true,
-          defaultAudioCodec: 'mp4a.40.2',
-          defaultVideoCodec: 'avc1.42E01E',
-          ignoreManifestProgramDateTime: false,
-          mediaPlaylistFullMimeType: 'video/mp2t',
-          useSafariBehaviorForLive: true,
-          liveSegmentsDelay: 3,
-        },
-      },
-      drm: {
-        retryParameters: {
-          maxAttempts: 5,
-          baseDelay: 1000,
-          backoffFactor: 2,
-          fuzzFactor: 0.5,
-          timeout: 30000,
-        },
-      },
+      abr: { enabled: true },
+      streaming: { bufferingGoal: 10, rebufferingGoal: 5, bufferBehind: 30 },
     });
 
     // DRM config - supports combined format and URL
@@ -367,122 +290,30 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
       }
     }
 
-    // Enhanced network request filter for headers, User-Agent, and cross-protocol redirects
-    const networkingEngine = shakaPlayer.getNetworkingEngine();
-    if (networkingEngine) {
-      networkingEngine.registerRequestFilter((_type: any, request: any) => {
-        // Allow cross-protocol redirects (HTTP -> HTTPS and vice versa)
-        request.allowCrossSiteCredentials = true;
-        
-        // Set default User-Agent if not provided
-        if (!request.headers['User-Agent']) {
-          request.headers['User-Agent'] = DEFAULT_USER_AGENT;
-        }
-        
-        // Add Origin header for CORS
-        if (!request.headers['Origin']) {
-          request.headers['Origin'] = window.location.origin;
-        }
-        
-        // Apply custom headers from stream config
-        if (stream.headers) {
-          try {
-            const headersObj = JSON.parse(stream.headers);
-            Object.assign(request.headers, headersObj);
-          } catch (e) { 
-            console.error('[Shaka] Invalid headers format:', e); 
-          }
-        }
-        
-        console.log('[Shaka] Request:', request.uris[0], request.headers);
-      });
-      
-      // Response filter for debugging
-      networkingEngine.registerResponseFilter((_type: any, response: any) => {
-        console.log('[Shaka] Response:', response.uri, 'Status:', response.status || 'OK', 'Size:', response.data?.byteLength || 0);
-      });
+    // Headers config
+    if (stream.headers) {
+      try {
+        const headersObj = JSON.parse(stream.headers);
+        shakaPlayer.getNetworkingEngine().registerRequestFilter((_type: any, request: any) => {
+          Object.assign(request.headers, headersObj);
+        });
+      } catch (e) { console.error('Invalid headers format', e); }
     }
 
-    // Comprehensive event listeners
     shakaPlayer.addEventListener('trackschanged', () => updateShakaTracks(shakaPlayer));
     shakaPlayer.addEventListener('variantchanged', () => updateShakaTracks(shakaPlayer));
-    shakaPlayer.addEventListener('buffering', (e: any) => {
-      console.log('[Shaka] Buffering:', e.buffering);
-      setIsBuffering(e.buffering);
-    });
-    
-    // Enhanced error handling with detailed logging
-    shakaPlayer.addEventListener('error', (e: any) => {
-      const errorCode = e.detail?.code || 'UNKNOWN';
-      const errorCategory = e.detail?.category || 'UNKNOWN';
-      const errorMessage = e.detail?.message || 'Unknown error';
-      const errorData = e.detail?.data || [];
-      
-      console.error('[Shaka] Playback Error:', {
-        code: errorCode,
-        category: errorCategory,
-        message: errorMessage,
-        data: errorData,
-        severity: e.detail?.severity,
-      });
-      
-      // User-friendly error messages
-      let displayError = `خطأ في التشغيل (${errorCode})`;
-      
-      if (errorCode === 1001 || errorCode === 1002) {
-        displayError = 'فشل في تحميل البث - تحقق من الرابط';
-      } else if (errorCode >= 3000 && errorCode < 4000) {
-        displayError = 'خطأ في الشبكة - تحقق من الاتصال';
-      } else if (errorCode >= 6000 && errorCode < 7000) {
-        displayError = 'خطأ في DRM - المفتاح غير صحيح';
-      }
-      
-      setError(displayError);
-    });
-    
-    // Additional event logging
-    shakaPlayer.addEventListener('loading', () => console.log('[Shaka] Loading...'));
-    shakaPlayer.addEventListener('loaded', () => console.log('[Shaka] Loaded successfully'));
-    shakaPlayer.addEventListener('unloading', () => console.log('[Shaka] Unloading...'));
-    shakaPlayer.addEventListener('adaptation', () => console.log('[Shaka] Quality adaptation'));
-    shakaPlayer.addEventListener('stalldetected', () => console.log('[Shaka] Stall detected'));
-    shakaPlayer.addEventListener('gapjumped', () => console.log('[Shaka] Gap jumped'));
+    shakaPlayer.addEventListener('buffering', (e: any) => setIsBuffering(e.buffering));
+    shakaPlayer.addEventListener('error', (e: any) => { console.error(e); setError(`Error: ${e.detail.code}`); });
 
     setPlayer(shakaPlayer);
 
     try {
-      console.log('[Shaka] Loading stream:', stream.url);
       await shakaPlayer.load(stream.url);
-      console.log('[Shaka] Stream loaded successfully');
       videoRef.current.play();
       setIsBuffering(false);
     } catch (e: any) {
-      const errorCode = e.code || 'UNKNOWN';
-      const errorCategory = e.category || 'UNKNOWN';
-      const errorMessage = e.message || 'Unknown error';
-      
-      console.error('[Shaka] Load Error:', {
-        code: errorCode,
-        category: errorCategory,
-        message: errorMessage,
-        data: e.data,
-        stack: e.stack,
-      });
-      
-      // User-friendly error for load failures
-      let displayError = `فشل في تحميل البث (${errorCode})`;
-      
-      if (errorCode === 1001) {
-        displayError = 'فشل في الاتصال بالخادم';
-      } else if (errorCode === 1002) {
-        displayError = 'فشل في تحميل ملف البث';
-      } else if (errorCode === 2000) {
-        displayError = 'صيغة البث غير مدعومة';
-      } else if (errorCode >= 3000 && errorCode < 4000) {
-        displayError = 'خطأ في الشبكة - تحقق من الاتصال';
-      }
-      
-      setError(displayError);
+      console.error(e);
+      setError(`Load Error: ${e.code}`);
       setIsBuffering(false);
     }
   };
