@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import PlayerWrapper from '@/components/player/PlayerWrapper';
 import { useIptvData } from '@/hooks/useIptvData';
 import { useTVNavigation } from '@/hooks/useTVNavigation';
@@ -55,6 +55,7 @@ const Index = () => {
   );
 
   const [activeSectionId, setActiveSectionId] = useState<string>(SETTINGS_ID);
+  const initialCategorySet = useRef(false);
   const [activeSideMenuId, setActiveSideMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -89,12 +90,13 @@ const Index = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Set first category when data loads
+  // Set first category when data loads (only on initial load)
   useEffect(() => {
-    if (activeSectionId === SETTINGS_ID && sortedCategories.length > 0) {
+    if (sortedCategories.length > 0 && !initialCategorySet.current) {
       setActiveSectionId(sortedCategories[0].id);
+      initialCategorySet.current = true;
     }
-  }, [sortedCategories, activeSectionId]);
+  }, [sortedCategories]);
 
   // Build nav items from Firebase categories
   const navItems = useMemo(() => {
