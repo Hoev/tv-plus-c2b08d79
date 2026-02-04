@@ -87,19 +87,35 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
     }
   }, [menu.open]);
 
-  // Handle user activity (mouse move, touch)
+  // Handle user activity (mouse move)
   const handleUserActivity = useCallback(() => {
-    setShowHUD(true);
-    resetHUDTimer();
-  }, [resetHUDTimer]);
-
-  // Toggle controls visibility on click/tap
-  const handleContainerClick = useCallback(() => {
-    setShowHUD(prev => !prev);
     if (!showHUD) {
-      resetHUDTimer();
+      setShowHUD(true);
     }
-  }, [showHUD, resetHUDTimer]);
+    resetHUDTimer();
+  }, [resetHUDTimer, showHUD]);
+
+  // Toggle controls visibility on click/tap - FIXED: Instant single tap toggle
+  const handleContainerClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    // Don't toggle if clicking on controls
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('.control-btn')) {
+      return;
+    }
+    
+    // Instant toggle - no delay
+    setShowHUD(prev => {
+      const newValue = !prev;
+      if (newValue) {
+        // If showing, start auto-hide timer
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          setShowHUD(false);
+        }, AUTO_HIDE_DELAY);
+      }
+      return newValue;
+    });
+  }, []);
 
   // TV Remote Navigation for control buttons
   const handleKeyNavigation = useCallback((e: KeyboardEvent) => {
@@ -386,10 +402,10 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[9999] bg-black flex flex-col"
+      className="fixed inset-0 z-[9999] bg-black flex flex-col touch-manipulation"
       onClick={handleContainerClick}
+      onTouchEnd={handleContainerClick}
       onMouseMove={handleUserActivity}
-      onTouchStart={handleUserActivity}
     >
       {/* Buffering Spinner */}
       {isBuffering && (

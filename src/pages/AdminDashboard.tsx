@@ -1,17 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import AdminLogin from './AdminLogin';
 import CategoryManager from '@/components/admin/CategoryManager';
 import ChannelManager from '@/components/admin/ChannelManager';
 import SideMenuManager from '@/components/admin/SideMenuManager';
+import NotificationManager from '@/components/admin/NotificationManager';
 import { Category } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, Settings, Tv, Menu, Folder, Shield } from 'lucide-react';
+import { LogOut, Settings, Tv, Menu, Folder, Shield, Bell } from 'lucide-react';
+
+// Update manifest for admin PWA
+const updateAdminManifest = () => {
+  const existingManifest = document.querySelector('link[rel="manifest"]');
+  if (existingManifest) {
+    existingManifest.setAttribute('href', '/admin-manifest.json');
+  }
+};
 
 const AdminDashboard: React.FC = () => {
   const { user, loading, isAuthorized, logout } = useAdminAuth();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+
+  // Set admin manifest for PWA
+  useEffect(() => {
+    updateAdminManifest();
+    // Update document title for admin
+    document.title = 'TV Control - لوحة التحكم';
+  }, []);
 
   if (loading) {
     return (
@@ -58,7 +74,7 @@ const AdminDashboard: React.FC = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue="categories" className="space-y-6">
-          <TabsList className="bg-secondary border border-border">
+          <TabsList className="bg-secondary border border-border flex-wrap">
             <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Folder className="w-4 h-4 mr-2" />
               الأقسام
@@ -66,6 +82,10 @@ const AdminDashboard: React.FC = () => {
             <TabsTrigger value="sidemenus" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Menu className="w-4 h-4 mr-2" />
               القوائم الجانبية
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Bell className="w-4 h-4 mr-2" />
+              الإشعارات
             </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="w-4 h-4 mr-2" />
@@ -96,6 +116,12 @@ const AdminDashboard: React.FC = () => {
 
           <TabsContent value="sidemenus">
             <SideMenuManager />
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <div className="max-w-2xl">
+              <NotificationManager />
+            </div>
           </TabsContent>
 
           <TabsContent value="settings">
