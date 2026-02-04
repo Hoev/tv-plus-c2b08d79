@@ -4,6 +4,7 @@ import { useIptvData } from '@/hooks/useIptvData';
 import { useTVNavigation } from '@/hooks/useTVNavigation';
 import { useClock } from '@/hooks/useClock';
 import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
+import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
 import type { Channel, StreamConfig, SubChannel } from '@/types/admin';
 
 const SETTINGS_ID = '__settings';
@@ -88,6 +89,30 @@ const Index = () => {
       }, 500);
     }, 500);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Auto-prompt for notifications on first visit
+  useEffect(() => {
+    autoPromptNotifications();
+    setupForegroundNotifications();
+    setupDeepLinkListener();
+    
+    // Handle deep link from URL params
+    const params = new URLSearchParams(window.location.search);
+    const channelId = params.get('channel');
+    const menuId = params.get('menu');
+    const subchannelId = params.get('subchannel');
+    
+    if (channelId || menuId) {
+      // Remove params from URL
+      window.history.replaceState({}, '', '/');
+      
+      // Handle navigation after data loads
+      if (menuId) {
+        setActiveSideMenuId(menuId);
+      }
+      // Channel/subchannel handling would be done after data loads
+    }
   }, []);
 
   // Set first category when data loads (only on initial load)

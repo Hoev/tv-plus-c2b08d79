@@ -38,24 +38,59 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[firebase-messaging-sw.js] Notification clicked:', event);
   event.notification.close();
 
-  const targetRoute = event.notification.data?.route || '/';
+  const data = event.notification.data || {};
+  const actionType = data.actionType;
+  
+  let targetUrl = '/';
+  
+  // Build URL based on action type
+  switch (actionType) {
+    case 'external_link':
+      if (data.externalUrl) {
+        targetUrl = data.externalUrl;
+      }
+      break;
+    case 'main_channel':
+      if (data.targetId) {
+        targetUrl = `/?channel=${data.targetId}`;
+      }
+      break;
+    case 'side_menu':
+      if (data.targetId) {
+        targetUrl = `/?menu=${data.targetId}`;
+      }
+      break;
+    case 'sub_channel':
+      if (data.targetId && data.parentMenuId) {
+        targetUrl = `/?menu=${data.parentMenuId}&subchannel=${data.targetId}`;
+      }
+      break;
+  }
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // For external links, open in new window
+      if (actionType === 'external_link' && data.externalUrl) {
+        return clients.openWindow(data.externalUrl);
+      }
+      
       // Try to focus existing window
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.focus();
           client.postMessage({
             type: 'NOTIFICATION_CLICK',
-            route: targetRoute
+            actionType: actionType,
+            targetId: data.targetId,
+            parentMenuId: data.parentMenuId,
+            externalUrl: data.externalUrl
           });
           return;
         }
       }
       // Open new window if none exists
       if (clients.openWindow) {
-        return clients.openWindow(targetRoute);
+        return clients.openWindow(targetUrl);
       }
     })
   );
