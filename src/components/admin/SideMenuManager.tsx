@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update, remove, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { SideMenu, SubChannel, StreamConfig } from '@/types/admin';
+import type { PlayerType } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import PlayerConfigForm from './PlayerConfigForm';
 import ImageUploader from './ImageUploader';
-import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, MonitorPlay, Play, Globe } from 'lucide-react';
 
 const SideMenuManager: React.FC = () => {
   const [sideMenus, setSideMenus] = useState<Record<string, SideMenu>>({});
@@ -25,7 +27,8 @@ const SideMenuManager: React.FC = () => {
     name: '',
     imageUrl: '',
     sortOrder: 0,
-    stream: { url: '' }
+    stream: { url: '' },
+    preferredPlayer: 'default'
   });
 
   useEffect(() => {
@@ -100,7 +103,8 @@ const SideMenuManager: React.FC = () => {
       name: '',
       imageUrl: '',
       sortOrder: channelCount,
-      stream: { url: '' }
+      stream: { url: '' },
+      preferredPlayer: 'default'
     });
     setIsChannelDialogOpen(true);
   };
@@ -111,7 +115,8 @@ const SideMenuManager: React.FC = () => {
       name: channel.name,
       imageUrl: channel.imageUrl,
       sortOrder: channel.sortOrder,
-      stream: channel.stream || { url: '' }
+      stream: channel.stream || { url: '' },
+      preferredPlayer: channel.preferredPlayer || 'default'
     });
     setIsChannelDialogOpen(true);
   };
@@ -123,7 +128,8 @@ const SideMenuManager: React.FC = () => {
       name: channelForm.name.trim(),
       imageUrl: channelForm.imageUrl?.trim() || '',
       sortOrder: channelForm.sortOrder || 0,
-      stream: channelForm.stream
+      stream: channelForm.stream,
+      preferredPlayer: channelForm.preferredPlayer || 'default'
     };
 
     try {
@@ -138,7 +144,7 @@ const SideMenuManager: React.FC = () => {
       }
 
       setIsChannelDialogOpen(false);
-      setChannelForm({ name: '', imageUrl: '', sortOrder: 0, stream: { url: '' } });
+      setChannelForm({ name: '', imageUrl: '', sortOrder: 0, stream: { url: '' }, preferredPlayer: 'default' });
     } catch (err) {
       console.error('Firebase save sub-channel error:', err);
       alert('فشل حفظ القناة داخل القائمة الجانبية. تأكد من صلاحيات الكتابة في Firebase (Rules).');
@@ -382,6 +388,37 @@ const SideMenuManager: React.FC = () => {
                 streamConfig={channelForm.stream || { url: '' }}
                 onChange={(stream) => setChannelForm(prev => ({ ...prev, stream }))}
               />
+
+              {/* Player Engine Selection */}
+              <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-border">
+                <Label className="flex items-center gap-2">
+                  <MonitorPlay className="w-4 h-4 text-primary" />
+                  محرك التشغيل (للمطورين فقط)
+                </Label>
+                <RadioGroup
+                  value={channelForm.preferredPlayer || 'default'}
+                  onValueChange={(value: PlayerType) => setChannelForm(prev => ({ ...prev, preferredPlayer: value }))}
+                  className="flex flex-wrap gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="default" id="sub_player_default" />
+                    <Label htmlFor="sub_player_default" className="flex items-center gap-2 cursor-pointer">
+                      <Play className="w-4 h-4 text-green-500" />
+                      المشغل الافتراضي (Native)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="jwplayer" id="sub_player_jwplayer" />
+                    <Label htmlFor="sub_player_jwplayer" className="flex items-center gap-2 cursor-pointer">
+                      <Globe className="w-4 h-4 text-blue-500" />
+                      مشغل الويب (JWPlayer)
+                    </Label>
+                  </div>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  اختر المشغل الذي سيستخدم لتشغيل هذه القناة.
+                </p>
+              </div>
             </div>
           </ScrollArea>
           <DialogFooter>

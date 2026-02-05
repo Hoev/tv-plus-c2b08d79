@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update, remove, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { Channel, Category, SideMenu, StreamConfig, ActionType } from '@/types/admin';
+import type { PlayerType } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import PlayerConfigForm from './PlayerConfigForm';
 import ImageUploader from './ImageUploader';
-import { Plus, Edit2, Trash2, Play, Menu, Tv, ChevronUp, ChevronDown, ExternalLink } from 'lucide-react';
+import { Plus, Edit2, Trash2, Play, Menu, Tv, ChevronUp, ChevronDown, ExternalLink, MonitorPlay, Globe } from 'lucide-react';
 
 interface ChannelManagerProps {
   category: Category;
@@ -33,7 +34,8 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
     actionType: 'direct_play',
     stream: { url: '' },
     sideMenuId: '',
-    externalUrl: ''
+    externalUrl: '',
+    preferredPlayer: 'default'
   });
 
   useEffect(() => {
@@ -97,7 +99,8 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       actionType: channel.actionType,
       stream: channel.stream || { url: '' },
       sideMenuId: channel.sideMenuId || '',
-      externalUrl: channel.externalUrl || ''
+      externalUrl: channel.externalUrl || '',
+      preferredPlayer: channel.preferredPlayer || 'default'
     });
     setIsDialogOpen(true);
   };
@@ -145,6 +148,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
     if (formData.actionType === 'direct_play') {
       // For direct play, include stream config and explicitly set others to null
       channelData.stream = formData.stream || { url: '' };
+      channelData.preferredPlayer = formData.preferredPlayer || 'default';
       channelData.sideMenuId = null;
       channelData.externalUrl = null;
     } else if (formData.actionType === 'open_submenu') {
@@ -152,11 +156,13 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       channelData.sideMenuId = formData.sideMenuId;
       channelData.stream = null;
       channelData.externalUrl = null;
+      channelData.preferredPlayer = null;
     } else if (formData.actionType === 'external_link') {
       // For external_link, include externalUrl and set others to null
       channelData.externalUrl = formData.externalUrl?.trim();
       channelData.stream = null;
       channelData.sideMenuId = null;
+      channelData.preferredPlayer = null;
     }
 
     // Debug logging
@@ -391,10 +397,43 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
               </div>
 
               {formData.actionType === 'direct_play' && (
-                <PlayerConfigForm
-                  streamConfig={formData.stream || { url: '' }}
-                  onChange={(stream) => setFormData(prev => ({ ...prev, stream }))}
-                />
+                <>
+                  {/* Player Engine Selection - Admin Only */}
+                  <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-border">
+                    <Label className="flex items-center gap-2">
+                      <MonitorPlay className="w-4 h-4 text-primary" />
+                      محرك التشغيل (للمطورين فقط)
+                    </Label>
+                    <RadioGroup
+                      value={formData.preferredPlayer || 'default'}
+                      onValueChange={(value: PlayerType) => setFormData(prev => ({ ...prev, preferredPlayer: value }))}
+                      className="flex flex-wrap gap-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="default" id="player_default" />
+                        <Label htmlFor="player_default" className="flex items-center gap-2 cursor-pointer">
+                          <Play className="w-4 h-4 text-green-500" />
+                          المشغل الافتراضي (Native)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="jwplayer" id="player_jwplayer" />
+                        <Label htmlFor="player_jwplayer" className="flex items-center gap-2 cursor-pointer">
+                          <Globe className="w-4 h-4 text-blue-500" />
+                          مشغل الويب (JWPlayer)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                    <p className="text-xs text-muted-foreground">
+                      اختر المشغل الذي سيستخدم لتشغيل هذه القناة. المشغل الافتراضي يدعم DRM بشكل أفضل.
+                    </p>
+                  </div>
+
+                  <PlayerConfigForm
+                    streamConfig={formData.stream || { url: '' }}
+                    onChange={(stream) => setFormData(prev => ({ ...prev, stream }))}
+                  />
+                </>
               )}
 
               {formData.actionType === 'open_submenu' && (
