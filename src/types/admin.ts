@@ -1,6 +1,6 @@
 export type ActionType = 'direct_play' | 'open_submenu' | 'external_link';
 
-export type PlayerType = 'default' | 'jwplayer';
+export type PlayerType = 'default' | 'custom' | 'iframe';
 
 export type ClearKeyMode = 'separate' | 'combined' | 'url';
 

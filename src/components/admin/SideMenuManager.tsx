@@ -12,8 +12,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import PlayerConfigForm from './PlayerConfigForm';
 import ImageUploader from './ImageUploader';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, MonitorPlay, Play, Globe } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, MonitorPlay, Play, Globe, Monitor } from 'lucide-react';
 
 const SideMenuManager: React.FC = () => {
   const [sideMenus, setSideMenus] = useState<Record<string, SideMenu>>({});
@@ -395,28 +395,36 @@ const SideMenuManager: React.FC = () => {
                   <MonitorPlay className="w-4 h-4 text-primary" />
                   محرك التشغيل (للمطورين فقط)
                 </Label>
-                <RadioGroup
+                <Select
                   value={channelForm.preferredPlayer || 'default'}
                   onValueChange={(value: PlayerType) => setChannelForm(prev => ({ ...prev, preferredPlayer: value }))}
-                  className="flex flex-wrap gap-4"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="default" id="sub_player_default" />
-                    <Label htmlFor="sub_player_default" className="flex items-center gap-2 cursor-pointer">
-                      <Play className="w-4 h-4 text-green-500" />
-                      المشغل الافتراضي (Native)
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="jwplayer" id="sub_player_jwplayer" />
-                    <Label htmlFor="sub_player_jwplayer" className="flex items-center gap-2 cursor-pointer">
-                      <Globe className="w-4 h-4 text-blue-500" />
-                      مشغل الويب (JWPlayer)
-                    </Label>
-                  </div>
-                </RadioGroup>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue placeholder="اختر نوع المشغل" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border z-50">
+                    <SelectItem value="default">
+                      <div className="flex items-center gap-2">
+                        <Play className="w-4 h-4 text-green-500" />
+                        <span>المشغل الافتراضي (Native)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="custom">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-blue-500" />
+                        <span>المشغل المخصص (Custom Player)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="iframe">
+                      <div className="flex items-center gap-2">
+                        <Monitor className="w-4 h-4 text-purple-500" />
+                        <span>Web/Iframe (تضمين مباشر)</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
-                  اختر المشغل الذي سيستخدم لتشغيل هذه القناة.
+                  اختر نوع المشغل لهذه القناة. المستخدم لن يرى خيار التبديل.
                 </p>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ProPlayer from './ProPlayer';
-import JWPlayer from './JWPlayer';
+import CustomPlayer from './CustomPlayer';
+import IframePlayer from './IframePlayer';
 import type { PlayerType } from '@/types/admin';
 
 interface StreamData {
@@ -32,10 +33,10 @@ const PlayerWrapper: React.FC = () => {
 
   if (!stream) return null;
 
-  // Render JWPlayer if preferred, otherwise default ProPlayer
-  if (stream.preferredPlayer === 'jwplayer') {
+  // Render based on player type - NO user switching, admin-controlled only
+  if (stream.preferredPlayer === 'custom') {
     return (
-      <JWPlayer
+      <CustomPlayer
         url={stream.url}
         title={stream.title}
         drm={stream.drm}
@@ -44,6 +45,17 @@ const PlayerWrapper: React.FC = () => {
     );
   }
 
+  if (stream.preferredPlayer === 'iframe') {
+    return (
+      <IframePlayer
+        url={stream.url}
+        title={stream.title}
+        onClose={() => setStream(null)}
+      />
+    );
+  }
+
+  // Default player
   return <ProPlayer stream={stream} onClose={() => setStream(null)} />;
 };
 
