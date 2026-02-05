@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import ProPlayer from './ProPlayer';
+import JWPlayer from './JWPlayer';
+import type { PlayerType } from '@/types/admin';
 
 interface StreamData {
   url: string;
   title: string;
   drm?: string;
   headers?: string;
-}
-
-// Global function to open player
-declare global {
-  interface Window {
-    openProPlayer: (url: string, title: string, drm?: string, headers?: string) => void;
-  }
+  preferredPlayer?: PlayerType;
 }
 
 const PlayerWrapper: React.FC = () => {
@@ -20,8 +16,8 @@ const PlayerWrapper: React.FC = () => {
 
   useEffect(() => {
     // Expose global function
-    window.openProPlayer = (url: string, title: string, drm?: string, headers?: string) => {
-      setStream({ url, title, drm, headers });
+    (window as any).openProPlayer = (url: string, title: string, drm?: string, headers?: string, preferredPlayer?: PlayerType) => {
+      setStream({ url, title, drm, headers, preferredPlayer });
       history.pushState({ player: true }, '');
     };
 
@@ -35,7 +31,19 @@ const PlayerWrapper: React.FC = () => {
   }, []);
 
   if (!stream) return null;
-  
+
+  // Render JWPlayer if preferred, otherwise default ProPlayer
+  if (stream.preferredPlayer === 'jwplayer') {
+    return (
+      <JWPlayer
+        url={stream.url}
+        title={stream.title}
+        drm={stream.drm}
+        onClose={() => setStream(null)}
+      />
+    );
+  }
+
   return <ProPlayer stream={stream} onClose={() => setStream(null)} />;
 };
 

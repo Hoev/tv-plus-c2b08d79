@@ -19,7 +19,7 @@ declare global {
   interface Window {
     YT: any;
     onYouTubeIframeAPIReady: any;
-    openProPlayer: (url: string, title: string, drm?: string, headers?: string) => void;
+    openProPlayer: (url: string, title: string, drm?: string, headers?: string, preferredPlayer?: string) => void;
   }
 }
 

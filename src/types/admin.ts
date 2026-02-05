@@ -1,5 +1,7 @@
 export type ActionType = 'direct_play' | 'open_submenu' | 'external_link';
 
+export type PlayerType = 'default' | 'jwplayer';
+
 export type ClearKeyMode = 'separate' | 'combined' | 'url';
 
 export interface DRMConfig {
@@ -24,6 +26,7 @@ export interface SubChannel {
   imageUrl: string;
   stream: StreamConfig;
   sortOrder: number;
+  preferredPlayer?: PlayerType;
 }
 
 export interface SideMenu {
@@ -42,6 +45,7 @@ export interface Channel {
   stream?: StreamConfig;
   sideMenuId?: string;
   externalUrl?: string; // For external link redirection
+  preferredPlayer?: PlayerType; // Per-channel player selection
 }
 
 export interface Category {

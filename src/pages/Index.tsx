@@ -6,6 +6,7 @@ import { useClock } from '@/hooks/useClock';
 import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
 import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
 import type { Channel, StreamConfig, SubChannel } from '@/types/admin';
+import type { PlayerType } from '@/types/admin';
 
 const SETTINGS_ID = '__settings';
 
@@ -181,7 +182,7 @@ const Index = () => {
   }, []);
 
   // Open player
-  const openFromStreamConfig = useCallback((stream: StreamConfig | undefined, title: string) => {
+  const openFromStreamConfig = useCallback((stream: StreamConfig | undefined, title: string, preferredPlayer?: PlayerType) => {
     if (!stream?.url) {
       alert('لا يوجد رابط بث لهذه القناة.');
       return;
@@ -196,7 +197,7 @@ const Index = () => {
     const headersStr = Object.keys(headers).length ? JSON.stringify(headers) : undefined;
 
     if (window.openProPlayer) {
-      window.openProPlayer(stream.url, title, drm, headersStr);
+      window.openProPlayer(stream.url, title, drm, headersStr, preferredPlayer);
     }
   }, [buildDrmString]);
 
@@ -205,7 +206,7 @@ const Index = () => {
     // Side menu items always play directly
     if (activeSideMenuId || !('actionType' in item)) {
       const sc = item as SubChannel;
-      openFromStreamConfig(sc.stream, sc.name);
+      openFromStreamConfig(sc.stream, sc.name, sc.preferredPlayer);
       return;
     }
 
@@ -232,7 +233,7 @@ const Index = () => {
     }
 
     // Default: direct play
-    openFromStreamConfig(ch.stream, ch.name);
+    openFromStreamConfig(ch.stream, ch.name, ch.preferredPlayer);
   }, [activeSideMenuId, fbSideMenus, openFromStreamConfig]);
 
   // Get visible channels for current section
