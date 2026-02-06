@@ -5,6 +5,7 @@ import { useTVNavigation } from '@/hooks/useTVNavigation';
 import { useClock } from '@/hooks/useClock';
 import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
 import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
+import { isAndroidApp, sendToAndroid, buildAndroidStreamConfig } from '@/lib/androidBridge';
 import type { Channel, StreamConfig, SubChannel } from '@/types/admin';
 import type { PlayerType } from '@/types/admin';
 
@@ -190,6 +191,21 @@ const Index = () => {
 
     const drm = buildDrmString(stream.drm);
 
+    // Check if running in Android app - use native player
+    if (isAndroidApp()) {
+      const androidConfig = buildAndroidStreamConfig(stream.url, title, {
+        userAgent: stream.userAgent,
+        referrer: stream.referrer,
+        cookies: stream.cookies,
+        drm: drm,
+      });
+      
+      if (sendToAndroid(androidConfig)) {
+        return; // Successfully sent to Android native player
+      }
+    }
+
+    // Fallback to web player
     const headers: Record<string, string> = {};
     if (stream.userAgent) headers['User-Agent'] = stream.userAgent;
     if (stream.referrer) headers['Referer'] = stream.referrer;
