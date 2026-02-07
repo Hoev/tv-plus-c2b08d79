@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update, remove, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
-import { Channel, Category, SideMenu, StreamConfig, ActionType } from '@/types/admin';
-import type { PlayerType } from '@/types/admin';
+import { Channel, Category, SideMenu, StreamConfig, ActionType, AndroidStreamConfig, AndroidActionType, WebPlayerType } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import PlayerConfigForm from './PlayerConfigForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ImageUploader from './ImageUploader';
-import { Plus, Edit2, Trash2, Play, Menu, Tv, ChevronUp, ChevronDown, ExternalLink, MonitorPlay, Globe, Monitor } from 'lucide-react';
+import WebConfigForm from './WebConfigForm';
+import AndroidConfigForm from './AndroidConfigForm';
+import { Plus, Edit2, Trash2, Play, Menu, Tv, ChevronUp, ChevronDown, ExternalLink, Globe, Smartphone } from 'lucide-react';
 
 interface ChannelManagerProps {
   category: Category;
@@ -35,7 +36,9 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
     stream: { url: '' },
     sideMenuId: '',
     externalUrl: '',
-    preferredPlayer: 'default'
+    preferredPlayer: 'default',
+    androidStream: { url: '' },
+    androidActionType: 'native'
   });
 
   useEffect(() => {
@@ -79,7 +82,10 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       actionType: 'direct_play',
       stream: { url: '' },
       sideMenuId: '',
-      externalUrl: ''
+      externalUrl: '',
+      preferredPlayer: 'default',
+      androidStream: { url: '' },
+      androidActionType: 'native'
     });
     setEditingChannel(null);
   };
@@ -100,7 +106,9 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       stream: channel.stream || { url: '' },
       sideMenuId: channel.sideMenuId || '',
       externalUrl: channel.externalUrl || '',
-      preferredPlayer: channel.preferredPlayer || 'default'
+      preferredPlayer: channel.preferredPlayer || 'default',
+      androidStream: channel.androidStream || { url: '' },
+      androidActionType: channel.androidActionType || 'native'
     });
     setIsDialogOpen(true);
   };
@@ -122,7 +130,6 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
         alert('الرجاء اختيار قائمة جانبية صالحة.');
         return;
       }
-      // Verify the selected side menu exists
       if (!sideMenus[formData.sideMenuId]) {
         alert('القائمة الجانبية المحددة غير موجودة. الرجاء اختيار قائمة أخرى.');
         return;
@@ -137,7 +144,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       }
     }
     
-    // Build channel data - Firebase doesn't accept undefined values, so we use null or omit them
+    // Build channel data
     const channelData: Record<string, any> = {
       name: formData.name.trim(),
       imageUrl: formData.imageUrl?.trim() || '',
@@ -146,50 +153,48 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
     };
 
     if (formData.actionType === 'direct_play') {
-      // For direct play, include stream config and explicitly set others to null
+      // Web settings
       channelData.stream = formData.stream || { url: '' };
       channelData.preferredPlayer = formData.preferredPlayer || 'default';
+      
+      // Android settings
+      channelData.androidStream = formData.androidStream || { url: '' };
+      channelData.androidActionType = formData.androidActionType || 'native';
+      
       channelData.sideMenuId = null;
       channelData.externalUrl = null;
     } else if (formData.actionType === 'open_submenu') {
-      // For open_submenu, include sideMenuId and set others to null
       channelData.sideMenuId = formData.sideMenuId;
       channelData.stream = null;
       channelData.externalUrl = null;
       channelData.preferredPlayer = null;
+      channelData.androidStream = null;
+      channelData.androidActionType = null;
     } else if (formData.actionType === 'external_link') {
-      // For external_link, include externalUrl and set others to null
       channelData.externalUrl = formData.externalUrl?.trim();
       channelData.stream = null;
       channelData.sideMenuId = null;
       channelData.preferredPlayer = null;
+      channelData.androidStream = null;
+      channelData.androidActionType = null;
     }
 
-    // Debug logging
     console.log('=== Channel Save Debug ===');
-    console.log('sectionId:', sectionId);
-    console.log('editingChannel:', editingChannel);
     console.log('channelData:', JSON.stringify(channelData, null, 2));
-    console.log('Firebase path:', `categories/${sectionId}/channels`);
 
     try {
       if (editingChannel) {
         const updatePath = `categories/${sectionId}/channels/${editingChannel.id}`;
-        console.log('Updating at path:', updatePath);
         await update(ref(db, updatePath), channelData);
       } else {
         const newRef = push(ref(db, `categories/${sectionId}/channels`));
-        console.log('Creating new channel with key:', newRef.key);
         await set(newRef, { ...channelData, id: newRef.key });
       }
 
-      console.log('Save successful!');
       setIsDialogOpen(false);
       resetForm();
     } catch (err: any) {
       console.error('Firebase save channel error:', err);
-      console.error('Error code:', err?.code);
-      console.error('Error message:', err?.message);
       alert(`فشل حفظ القناة: ${err?.message || 'خطأ غير معروف'}`);
     }
   };
@@ -304,6 +309,12 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                       <>
                         <Play className="w-3 h-3" />
                         <span>تشغيل مباشر</span>
+                        <span className="text-blue-400 flex items-center gap-1">
+                          <Globe className="w-3 h-3" /> {channel.preferredPlayer || 'default'}
+                        </span>
+                        <span className="text-green-400 flex items-center gap-1">
+                          <Smartphone className="w-3 h-3" /> {channel.androidActionType || 'native'}
+                        </span>
                       </>
                     ) : channel.actionType === 'external_link' ? (
                       <>
@@ -342,12 +353,13 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh]">
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingChannel ? 'تعديل القناة' : 'إضافة قناة جديدة'}</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
+          <ScrollArea className="max-h-[70vh] pr-4">
             <div className="space-y-6 py-4">
+              {/* Basic Info */}
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>اسم القناة <span className="text-destructive">*</span></Label>
@@ -365,6 +377,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                 />
               </div>
 
+              {/* Action Type */}
               <div className="space-y-3">
                 <Label>نوع الإجراء</Label>
                 <RadioGroup
@@ -396,52 +409,38 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                 </RadioGroup>
               </div>
 
+              {/* Platform-specific settings (only for direct_play) */}
               {formData.actionType === 'direct_play' && (
-                <>
-                  {/* Player Engine Selection - Admin Only */}
-                  <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-border">
-                    <Label className="flex items-center gap-2">
-                      <MonitorPlay className="w-4 h-4 text-primary" />
-                      محرك التشغيل (للمطورين فقط)
-                    </Label>
-                    <Select
-                      value={formData.preferredPlayer || 'default'}
-                      onValueChange={(value: PlayerType) => setFormData(prev => ({ ...prev, preferredPlayer: value }))}
-                    >
-                      <SelectTrigger className="bg-secondary border-border">
-                        <SelectValue placeholder="اختر نوع المشغل" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border z-50">
-                        <SelectItem value="default">
-                          <div className="flex items-center gap-2">
-                            <Play className="w-4 h-4 text-green-500" />
-                            <span>المشغل الافتراضي (Native)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="custom">
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4 text-blue-500" />
-                            <span>المشغل المخصص (Custom Player)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="iframe">
-                          <div className="flex items-center gap-2">
-                            <Monitor className="w-4 h-4 text-purple-500" />
-                            <span>Web/Iframe (تضمين مباشر)</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      اختر نوع المشغل لهذه القناة. المستخدم لن يرى خيار التبديل بين المشغلات.
-                    </p>
-                  </div>
-
-                  <PlayerConfigForm
-                    streamConfig={formData.stream || { url: '' }}
-                    onChange={(stream) => setFormData(prev => ({ ...prev, stream }))}
-                  />
-                </>
+                <Tabs defaultValue="web" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="web" className="flex items-center gap-2">
+                      <Globe className="w-4 h-4" />
+                      الويب
+                    </TabsTrigger>
+                    <TabsTrigger value="android" className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4" />
+                      أندرويد
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="web" className="mt-4">
+                    <WebConfigForm
+                      streamConfig={formData.stream || { url: '' }}
+                      playerType={formData.preferredPlayer || 'default'}
+                      onStreamChange={(stream) => setFormData(prev => ({ ...prev, stream }))}
+                      onPlayerTypeChange={(playerType) => setFormData(prev => ({ ...prev, preferredPlayer: playerType }))}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="android" className="mt-4">
+                    <AndroidConfigForm
+                      config={formData.androidStream || { url: '' }}
+                      actionType={formData.androidActionType || 'native'}
+                      onChange={(config) => setFormData(prev => ({ ...prev, androidStream: config as AndroidStreamConfig }))}
+                      onActionTypeChange={(actionType) => setFormData(prev => ({ ...prev, androidActionType: actionType }))}
+                    />
+                  </TabsContent>
+                </Tabs>
               )}
 
               {formData.actionType === 'open_submenu' && (
@@ -450,7 +449,6 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                   <Select
                     value={formData.sideMenuId || undefined}
                     onValueChange={(value) => {
-                      console.log('Selected sideMenuId:', value);
                       if (value) {
                         setFormData(prev => ({ ...prev, sideMenuId: value }));
                       }

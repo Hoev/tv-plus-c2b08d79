@@ -1,5 +1,7 @@
 package app.lovable.tvplus;
 
+import android.content.pm.ActivityInfo;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
@@ -12,6 +14,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
@@ -20,116 +25,153 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
-import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.dash.DashMediaSource;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ProgressiveMediaSource;
+import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
 
 import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
-
-import app.lovable.tvplus.databinding.ActivityPlayerBinding;
 
 /**
- * Full-screen video player using ExoPlayer (Media3)
- * Supports HLS, DASH, MP4 with custom headers and ClearKey DRM
+ * Native ExoPlayer Activity with custom Gold & Black theme
+ * Supports HLS, DASH, progressive streams with headers and DRM
+ * TV Remote friendly with focusable controls
  */
 @OptIn(markerClass = UnstableApi.class)
 public class PlayerActivity extends AppCompatActivity {
 
     private static final String TAG = "PlayerActivity";
     
-    private ActivityPlayerBinding binding;
-    private ExoPlayer player;
     private PlayerView playerView;
+    private ExoPlayer player;
     private StreamConfig streamConfig;
+    private Gson gson = new Gson();
+    
+    // Aspect ratio modes
+    private int currentResizeMode = 0;
+    private final int[] resizeModes = {
+        AspectRatioFrameLayout.RESIZE_MODE_FIT,
+        AspectRatioFrameLayout.RESIZE_MODE_FILL,
+        AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Keep screen on
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // Force landscape and fullscreen
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        enableFullscreen();
         
-        // Full screen immersive mode
-        hideSystemUI();
+        setContentView(R.layout.activity_player);
         
-        binding = ActivityPlayerBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        playerView = findViewById(R.id.playerView);
         
-        playerView = binding.playerView;
-        
-        // Parse stream configuration from intent
-        String jsonConfig = getIntent().getStringExtra("streamConfig");
-        if (jsonConfig == null || jsonConfig.isEmpty()) {
+        // Parse stream config from intent
+        String configJson = getIntent().getStringExtra("streamConfig");
+        if (configJson == null || configJson.isEmpty()) {
             Toast.makeText(this, "No stream configuration provided", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
         
         try {
-            Gson gson = new Gson();
-            streamConfig = gson.fromJson(jsonConfig, StreamConfig.class);
-            
-            if (streamConfig.url == null || streamConfig.url.isEmpty()) {
-                Toast.makeText(this, "Invalid stream URL", Toast.LENGTH_SHORT).show();
-                finish();
-                return;
-            }
-            
-            // Set title
-            setupCustomControls();
-            
-            // Initialize player
-            initializePlayer();
-            
+            streamConfig = gson.fromJson(configJson, StreamConfig.class);
+            Log.d(TAG, "Stream URL: " + streamConfig.url);
+            Log.d(TAG, "Has headers: " + streamConfig.hasHeaders());
+            Log.d(TAG, "Has DRM: " + streamConfig.hasDrm());
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing stream config", e);
-            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Failed to parse stream config", e);
+            Toast.makeText(this, "Invalid stream configuration", Toast.LENGTH_SHORT).show();
             finish();
+            return;
         }
+        
+        setupUI();
+        initializePlayer();
     }
 
-    private void setupCustomControls() {
-        // Find custom controller views
-        TextView titleView = playerView.findViewById(R.id.exo_title);
-        ImageButton backButton = playerView.findViewById(R.id.exo_back);
+    private void enableFullscreen() {
+        getWindow().setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+        );
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+        controller.hide(WindowInsetsCompat.Type.systemBars());
+        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+    }
+
+    private void setupUI() {
+        // Set title
+        TextView titleView = playerView.findViewById(R.id.exo_title);
         if (titleView != null && streamConfig.title != null) {
             titleView.setText(streamConfig.title);
         }
         
+        // Back button
+        ImageButton backButton = playerView.findViewById(R.id.exo_back);
         if (backButton != null) {
             backButton.setOnClickListener(v -> finish());
         }
+        
+        // Resize button
+        ImageButton resizeButton = playerView.findViewById(R.id.exo_resize);
+        if (resizeButton != null) {
+            resizeButton.setOnClickListener(v -> cycleResizeMode());
+        }
+        
+        // PiP button (placeholder - requires Android O+)
+        ImageButton pipButton = playerView.findViewById(R.id.exo_pip);
+        if (pipButton != null) {
+            pipButton.setOnClickListener(v -> {
+                Toast.makeText(this, "PiP requires Android 8.0+", Toast.LENGTH_SHORT).show();
+            });
+        }
+        
+        // Settings button for track selection
+        ImageButton settingsButton = playerView.findViewById(R.id.exo_settings);
+        if (settingsButton != null) {
+            settingsButton.setOnClickListener(v -> {
+                // TODO: Show track selection dialog
+                Toast.makeText(this, "Track selection coming soon", Toast.LENGTH_SHORT).show();
+            });
+        }
+    }
+
+    private void cycleResizeMode() {
+        currentResizeMode = (currentResizeMode + 1) % resizeModes.length;
+        playerView.setResizeMode(resizeModes[currentResizeMode]);
+        
+        String[] modeNames = {"Fit", "Fill", "Zoom"};
+        Toast.makeText(this, modeNames[currentResizeMode], Toast.LENGTH_SHORT).show();
     }
 
     private void initializePlayer() {
-        // Build ExoPlayer
-        player = new ExoPlayer.Builder(this).build();
+        // Build data source factory with custom headers
+        DataSource.Factory dataSourceFactory = buildDataSourceFactory();
+        
+        // Build player
+        player = new ExoPlayer.Builder(this)
+            .build();
+        
         playerView.setPlayer(player);
         
-        // Create data source factory with custom headers
-        DataSource.Factory dataSourceFactory = createDataSourceFactory();
+        // Build media source
+        MediaSource mediaSource = buildMediaSource(dataSourceFactory);
         
-        // Create media source based on URL type
-        MediaSource mediaSource = createMediaSource(dataSourceFactory);
-        
-        // Set up player
-        player.setMediaSource(mediaSource);
-        player.setPlayWhenReady(true);
-        player.prepare();
-        
-        // Error listener
+        // Add error listener
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
-                Log.e(TAG, "Player error: " + error.getMessage());
+                Log.e(TAG, "Playback error: " + error.getMessage(), error);
                 Toast.makeText(PlayerActivity.this, 
                     "Playback error: " + error.getMessage(), 
                     Toast.LENGTH_LONG).show();
@@ -137,121 +179,143 @@ public class PlayerActivity extends AppCompatActivity {
             
             @Override
             public void onPlaybackStateChanged(int playbackState) {
-                if (playbackState == Player.STATE_ENDED) {
-                    finish();
+                if (playbackState == Player.STATE_READY) {
+                    Log.d(TAG, "Playback ready");
+                } else if (playbackState == Player.STATE_ENDED) {
+                    Log.d(TAG, "Playback ended");
                 }
             }
         });
+        
+        // Prepare and play
+        player.setMediaSource(mediaSource);
+        player.prepare();
+        player.setPlayWhenReady(true);
     }
 
-    private DataSource.Factory createDataSourceFactory() {
+    private DataSource.Factory buildDataSourceFactory() {
         DefaultHttpDataSource.Factory factory = new DefaultHttpDataSource.Factory();
         
-        // Set connection timeouts
+        // Set timeouts
         factory.setConnectTimeoutMs(30000);
         factory.setReadTimeoutMs(30000);
         factory.setAllowCrossProtocolRedirects(true);
         
-        // Apply custom headers
+        // Apply custom headers if present
         if (streamConfig.hasHeaders()) {
             Map<String, String> headers = new HashMap<>();
             
             if (!streamConfig.getUserAgent().isEmpty()) {
                 factory.setUserAgent(streamConfig.getUserAgent());
+                Log.d(TAG, "Setting User-Agent: " + streamConfig.getUserAgent());
             }
             
             if (!streamConfig.getReferer().isEmpty()) {
                 headers.put("Referer", streamConfig.getReferer());
+                Log.d(TAG, "Setting Referer: " + streamConfig.getReferer());
             }
             
             if (!streamConfig.getCookie().isEmpty()) {
                 headers.put("Cookie", streamConfig.getCookie());
+                Log.d(TAG, "Setting Cookie: " + streamConfig.getCookie());
             }
             
             if (!streamConfig.getOrigin().isEmpty()) {
                 headers.put("Origin", streamConfig.getOrigin());
+                Log.d(TAG, "Setting Origin: " + streamConfig.getOrigin());
             }
             
             if (!headers.isEmpty()) {
                 factory.setDefaultRequestProperties(headers);
             }
-            
-            Log.d(TAG, "Applied custom headers: UA=" + streamConfig.getUserAgent() + 
-                ", Referer=" + streamConfig.getReferer());
         }
         
         return factory;
     }
 
-    private MediaSource createMediaSource(DataSource.Factory dataSourceFactory) {
-        String url = streamConfig.url.toLowerCase();
-        MediaItem.Builder mediaItemBuilder = new MediaItem.Builder()
-            .setUri(streamConfig.url);
+    private MediaSource buildMediaSource(DataSource.Factory dataSourceFactory) {
+        String url = streamConfig.url;
         
-        // Apply ClearKey DRM if provided
-        if (streamConfig.hasDrm()) {
-            String drm = streamConfig.drm;
+        // IMPORTANT: Do NOT strip or modify URL - preserve tokens, commas, etc.
+        Uri uri = Uri.parse(url);
+        
+        // Build MediaItem
+        MediaItem.Builder mediaItemBuilder = new MediaItem.Builder()
+            .setUri(uri);
+        
+        // Apply DRM if configured
+        if (streamConfig.hasDrm() && streamConfig.drm != null) {
+            MediaItem.DrmConfiguration.Builder drmBuilder;
             
-            // Check if it's a URL or key:id format
-            if (drm.startsWith("http")) {
-                // License URL - not directly supported, need custom handling
-                Log.d(TAG, "DRM License URL provided: " + drm);
-            } else if (drm.contains(":")) {
-                // ClearKey format: keyId:key
-                try {
-                    String[] parts = drm.split(":");
-                    if (parts.length >= 2) {
-                        String keyId = parts[0].trim();
-                        String key = parts[1].trim();
-                        
-                        // Create ClearKey license
-                        String clearKeyJson = createClearKeyLicense(keyId, key);
-                        String clearKeyBase64 = Base64.encodeToString(
-                            clearKeyJson.getBytes(), Base64.NO_WRAP);
-                        
-                        String licenseUri = "data:application/json;base64," + clearKeyBase64;
-                        
-                        mediaItemBuilder.setDrmConfiguration(
-                            new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID)
-                                .setLicenseUri(licenseUri)
-                                .build()
-                        );
-                        
-                        Log.d(TAG, "Applied ClearKey DRM");
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error applying DRM", e);
+            String scheme = streamConfig.drm.scheme != null ? 
+                streamConfig.drm.scheme.toLowerCase() : "clearkey";
+            
+            if ("widevine".equals(scheme)) {
+                drmBuilder = new MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID);
+                if (streamConfig.drm.licenseUrl != null) {
+                    drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
+                }
+            } else if ("playready".equals(scheme)) {
+                drmBuilder = new MediaItem.DrmConfiguration.Builder(C.PLAYREADY_UUID);
+                if (streamConfig.drm.licenseUrl != null) {
+                    drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
+                }
+            } else {
+                // ClearKey
+                drmBuilder = new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID);
+                
+                // Build ClearKey JSON if keyId and key are provided
+                if (streamConfig.drm.keyId != null && streamConfig.drm.key != null) {
+                    String clearKeyJson = buildClearKeyJson(
+                        streamConfig.drm.keyId, 
+                        streamConfig.drm.key
+                    );
+                    drmBuilder.setLicenseUri("data:application/json;base64," + 
+                        Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP));
+                } else if (streamConfig.drm.licenseUrl != null) {
+                    drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                 }
             }
+            
+            mediaItemBuilder.setDrmConfiguration(drmBuilder.build());
         }
         
         MediaItem mediaItem = mediaItemBuilder.build();
         
-        // Determine source type from URL
-        if (url.contains(".m3u8") || url.contains("hls")) {
+        // Detect stream type and build appropriate source
+        String path = uri.getPath();
+        if (path == null) path = url;
+        
+        if (path.contains(".m3u8") || url.contains("m3u8")) {
+            Log.d(TAG, "Building HLS source");
             return new HlsMediaSource.Factory(dataSourceFactory)
+                .setAllowChunklessPreparation(true)
                 .createMediaSource(mediaItem);
-        } else if (url.contains(".mpd") || url.contains("dash")) {
+        } else if (path.contains(".mpd") || url.contains("mpd")) {
+            Log.d(TAG, "Building DASH source");
             return new DashMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);
         } else {
+            Log.d(TAG, "Building Progressive source");
             return new ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);
         }
     }
 
-    private String createClearKeyLicense(String keyId, String key) {
+    private String buildClearKeyJson(String keyId, String key) {
         // Convert hex to base64url
         String keyIdB64 = hexToBase64Url(keyId);
         String keyB64 = hexToBase64Url(key);
         
-        return "{\"keys\":[{\"kty\":\"oct\",\"k\":\"" + keyB64 + 
-               "\",\"kid\":\"" + keyIdB64 + "\"}],\"type\":\"temporary\"}";
+        return String.format(
+            "{\"keys\":[{\"kty\":\"oct\",\"k\":\"%s\",\"kid\":\"%s\"}],\"type\":\"temporary\"}",
+            keyB64, keyIdB64
+        );
     }
 
     private String hexToBase64Url(String hex) {
-        // Remove any non-hex characters
-        hex = hex.replaceAll("[^0-9A-Fa-f]", "");
+        // Remove any spaces or colons
+        hex = hex.replaceAll("[:\\s-]", "");
         
         int len = hex.length();
         byte[] data = new byte[len / 2];
@@ -260,47 +324,36 @@ public class PlayerActivity extends AppCompatActivity {
                 + Character.digit(hex.charAt(i + 1), 16));
         }
         
-        // Base64 URL encode (no padding, URL safe chars)
-        return Base64.encodeToString(data, Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
-    }
-
-    private void hideSystemUI() {
-        View decorView = getWindow().getDecorView();
-        decorView.setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            | View.SYSTEM_UI_FLAG_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        );
+        // Base64URL encoding (no padding, url-safe)
+        String base64 = Base64.encodeToString(data, Base64.NO_WRAP | Base64.URL_SAFE | Base64.NO_PADDING);
+        return base64;
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onResume() {
+        super.onResume();
         if (player != null) {
             player.setPlayWhenReady(true);
         }
     }
 
     @Override
-    protected void onStop() {
+    protected void onPause() {
+        super.onPause();
         if (player != null) {
             player.setPlayWhenReady(false);
         }
-        super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        super.onDestroy();
         if (player != null) {
             player.release();
             player = null;
         }
-        super.onDestroy();
     }
-
+    
     @Override
     public void onBackPressed() {
         finish();

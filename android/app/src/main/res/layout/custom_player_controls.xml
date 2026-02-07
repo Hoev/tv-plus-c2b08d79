@@ -21,11 +21,14 @@
             android:id="@+id/exo_back"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/btn_secondary_focus_selector"
             android:contentDescription="Back"
             android:src="@drawable/ic_back"
             android:tint="@color/gold_accent"
-            android:padding="8dp" />
+            android:padding="8dp"
+            android:focusable="true"
+            android:nextFocusRight="@id/exo_rew"
+            android:nextFocusDown="@id/exo_rew" />
 
         <TextView
             android:id="@+id/exo_title"
@@ -39,6 +42,19 @@
             android:textColor="@android:color/white"
             android:textSize="18sp"
             android:textStyle="bold" />
+
+        <!-- Settings button for track selection -->
+        <ImageButton
+            android:id="@+id/exo_settings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/btn_secondary_focus_selector"
+            android:contentDescription="Settings"
+            android:src="@drawable/ic_settings"
+            android:tint="@color/gold_accent"
+            android:padding="8dp"
+            android:focusable="true" />
 
     </LinearLayout>
 
@@ -55,38 +71,49 @@
             android:id="@id/exo_rew"
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:layout_marginEnd="24dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Rewind"
+            android:layout_marginEnd="32dp"
+            android:background="@drawable/btn_secondary_focus_selector"
+            android:contentDescription="Rewind 10 seconds"
             android:src="@drawable/ic_rewind_10"
-            android:tint="@color/gold_accent" />
+            android:tint="@color/gold_accent"
+            android:focusable="true"
+            android:nextFocusLeft="@id/exo_back"
+            android:nextFocusRight="@id/exo_play_pause" />
 
-        <!-- Play/Pause -->
+        <!-- Hidden TimeBar for ExoPlayer binding -->
         <androidx.media3.ui.DefaultTimeBar
             android:visibility="gone"
             android:layout_width="0dp"
             android:layout_height="0dp" />
 
+        <!-- Large Gold Circular Play/Pause Button -->
         <ImageButton
             android:id="@id/exo_play_pause"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:background="@drawable/circle_background"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:background="@drawable/btn_focus_selector"
             android:contentDescription="Play/Pause"
             android:src="@drawable/ic_play"
             android:tint="@android:color/black"
-            android:padding="16dp" />
+            android:padding="20dp"
+            android:focusable="true"
+            android:nextFocusLeft="@id/exo_rew"
+            android:nextFocusRight="@id/exo_ffwd"
+            android:nextFocusDown="@id/exo_progress" />
 
         <!-- Forward 10s -->
         <ImageButton
             android:id="@id/exo_ffwd"
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:layout_marginStart="24dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Forward"
+            android:layout_marginStart="32dp"
+            android:background="@drawable/btn_secondary_focus_selector"
+            android:contentDescription="Forward 10 seconds"
             android:src="@drawable/ic_forward_10"
-            android:tint="@color/gold_accent" />
+            android:tint="@color/gold_accent"
+            android:focusable="true"
+            android:nextFocusLeft="@id/exo_play_pause"
+            android:nextFocusRight="@id/exo_pip" />
 
     </LinearLayout>
 
@@ -100,29 +127,48 @@
         android:gravity="center_vertical"
         android:orientation="vertical"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp">
+        android:paddingVertical="12dp">
 
-        <!-- Time Bar -->
+        <!-- Time Bar (Gold Seekbar) -->
         <androidx.media3.ui.DefaultTimeBar
             android:id="@id/exo_progress"
             android:layout_width="match_parent"
-            android:layout_height="26dp"
+            android:layout_height="32dp"
             app:played_color="@color/gold_accent"
             app:unplayed_color="#44FFFFFF"
             app:buffered_color="#88FFD700"
             app:scrubber_color="@color/gold_accent"
-            app:scrubber_enabled_size="16dp"
-            app:bar_height="4dp" />
+            app:scrubber_enabled_size="20dp"
+            app:scrubber_disabled_size="12dp"
+            app:bar_height="4dp"
+            android:focusable="true"
+            android:nextFocusUp="@id/exo_play_pause" />
 
-        <!-- Time Display -->
+        <!-- Time Display and Extra Controls -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingTop="4dp">
+            android:gravity="center_vertical"
+            android:paddingTop="8dp">
 
             <TextView
                 android:id="@id/exo_position"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" / "
+                android:textColor="#88FFFFFF"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@id/exo_duration"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@android:color/white"
@@ -134,13 +180,31 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
-            <TextView
-                android:id="@id/exo_duration"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:includeFontPadding="false" />
+            <!-- PiP Button -->
+            <ImageButton
+                android:id="@+id/exo_pip"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/btn_secondary_focus_selector"
+                android:contentDescription="Picture in Picture"
+                android:src="@drawable/ic_pip"
+                android:tint="@color/gold_accent"
+                android:padding="10dp"
+                android:focusable="true"
+                android:nextFocusLeft="@id/exo_ffwd" />
+
+            <!-- Resize/Aspect Ratio Button -->
+            <ImageButton
+                android:id="@+id/exo_resize"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/btn_secondary_focus_selector"
+                android:contentDescription="Resize"
+                android:src="@drawable/ic_resize"
+                android:tint="@color/gold_accent"
+                android:padding="10dp"
+                android:focusable="true" />
 
         </LinearLayout>
 

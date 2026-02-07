@@ -1,6 +1,13 @@
 export type ActionType = 'direct_play' | 'open_submenu' | 'external_link';
 
-export type PlayerType = 'default' | 'custom' | 'iframe';
+// Web-specific player types
+export type WebPlayerType = 'default' | 'custom' | 'iframe';
+
+// Android-specific action types
+export type AndroidActionType = 'native' | 'webview' | 'intent';
+
+// DRM schemes for Android
+export type DrmScheme = 'widevine' | 'clearkey' | 'playready';
 
 export type ClearKeyMode = 'separate' | 'combined' | 'url';
 
@@ -12,6 +19,14 @@ export interface DRMConfig {
   clearKeyMode?: ClearKeyMode;
 }
 
+// Headers configuration (shared structure)
+export interface StreamHeaders {
+  userAgent?: string;
+  referrer?: string;
+  cookie?: string;
+  origin?: string;
+}
+
 export interface StreamConfig {
   url: string;
   userAgent?: string;
@@ -20,13 +35,34 @@ export interface StreamConfig {
   drm?: DRMConfig;
 }
 
+// Web-specific stream configuration
+export interface WebStreamConfig {
+  url: string;
+  headers?: StreamHeaders;
+  drm?: DRMConfig;
+}
+
+// Android-specific stream configuration
+export interface AndroidStreamConfig {
+  url: string;
+  headers?: StreamHeaders;
+  intentUri?: string; // For launching external apps
+  drmLicenseUrl?: string;
+  drmScheme?: DrmScheme;
+  servers?: Array<{ name: string; url: string }>; // Multi-server support
+}
+
 export interface SubChannel {
   id: string;
   name: string;
   imageUrl: string;
   stream: StreamConfig;
   sortOrder: number;
-  preferredPlayer?: PlayerType;
+  preferredPlayer?: WebPlayerType;
+  
+  // Android-specific
+  androidStream?: AndroidStreamConfig;
+  androidActionType?: AndroidActionType;
 }
 
 export interface SideMenu {
@@ -42,10 +78,16 @@ export interface Channel {
   imageUrl: string;
   sortOrder: number;
   actionType: ActionType;
+  
+  // === Web Settings ===
   stream?: StreamConfig;
   sideMenuId?: string;
   externalUrl?: string; // For external link redirection
-  preferredPlayer?: PlayerType; // Per-channel player selection
+  preferredPlayer?: WebPlayerType; // Per-channel web player selection
+  
+  // === Android Settings ===
+  androidStream?: AndroidStreamConfig;
+  androidActionType?: AndroidActionType; // 'native', 'webview', 'intent'
 }
 
 export interface Category {
@@ -59,3 +101,6 @@ export interface AdminData {
   categories: Record<string, Category>;
   sideMenus: Record<string, SideMenu>;
 }
+
+// Legacy type alias for backward compatibility
+export type PlayerType = WebPlayerType;
