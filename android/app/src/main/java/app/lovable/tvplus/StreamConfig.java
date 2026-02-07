@@ -1,9 +1,11 @@
 package app.lovable.tvplus;
 
 import com.google.gson.annotations.SerializedName;
+import java.util.List;
 
 /**
  * Data class representing stream configuration passed from WebView
+ * Supports the split Web/Android architecture
  */
 public class StreamConfig {
     
@@ -13,11 +15,20 @@ public class StreamConfig {
     @SerializedName("title")
     public String title;
     
+    @SerializedName("actionType")
+    public String actionType; // "native", "webview", "intent"
+    
     @SerializedName("headers")
     public Headers headers;
     
     @SerializedName("drm")
-    public String drm; // Format: "keyId:key" or URL
+    public DrmConfig drm;
+    
+    @SerializedName("intentUri")
+    public String intentUri;
+    
+    @SerializedName("servers")
+    public List<Server> servers;
     
     public static class Headers {
         @SerializedName("User-Agent")
@@ -31,6 +42,28 @@ public class StreamConfig {
         
         @SerializedName("Origin")
         public String origin;
+    }
+    
+    public static class DrmConfig {
+        @SerializedName("licenseUrl")
+        public String licenseUrl;
+        
+        @SerializedName("scheme")
+        public String scheme; // "widevine", "clearkey", "playready"
+        
+        @SerializedName("keyId")
+        public String keyId;
+        
+        @SerializedName("key")
+        public String key;
+    }
+    
+    public static class Server {
+        @SerializedName("name")
+        public String name;
+        
+        @SerializedName("url")
+        public String url;
     }
     
     // Helper methods
@@ -51,7 +84,10 @@ public class StreamConfig {
     }
     
     public boolean hasDrm() {
-        return drm != null && !drm.isEmpty();
+        return drm != null && (
+            (drm.licenseUrl != null && !drm.licenseUrl.isEmpty()) ||
+            (drm.keyId != null && !drm.keyId.isEmpty())
+        );
     }
     
     public boolean hasHeaders() {
@@ -61,5 +97,21 @@ public class StreamConfig {
             (headers.cookie != null && !headers.cookie.isEmpty()) ||
             (headers.origin != null && !headers.origin.isEmpty())
         );
+    }
+    
+    public boolean hasServers() {
+        return servers != null && !servers.isEmpty();
+    }
+    
+    public boolean isNativeAction() {
+        return actionType == null || actionType.isEmpty() || "native".equals(actionType);
+    }
+    
+    public boolean isWebViewAction() {
+        return "webview".equals(actionType);
+    }
+    
+    public boolean isIntentAction() {
+        return "intent".equals(actionType);
     }
 }

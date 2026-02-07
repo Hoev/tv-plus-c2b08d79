@@ -2,6 +2,7 @@ package app.lovable.tvplus;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -12,15 +13,19 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.gson.Gson;
+
 import app.lovable.tvplus.databinding.ActivityMainBinding;
 
 /**
  * Main Activity hosting the WebView that loads the TV Plus web app
+ * Handles the split Web/Android architecture with different action types
  */
 public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding binding;
     private WebView webView;
+    private Gson gson = new Gson();
     
     // Your web app URL
     private static final String WEB_APP_URL = "https://tv-plus.lovable.app";
@@ -90,12 +95,28 @@ public class MainActivity extends AppCompatActivity {
         public void playVideo(String jsonConfig) {
             runOnUiThread(() -> {
                 try {
-                    Intent intent = new Intent(MainActivity.this, PlayerActivity.class);
-                    intent.putExtra("streamConfig", jsonConfig);
-                    startActivity(intent);
+                    StreamConfig config = gson.fromJson(jsonConfig, StreamConfig.class);
+                    
+                    if (config == null) {
+                        showToast("Invalid stream configuration");
+                        return;
+                    }
+                    
+                    // Handle different action types
+                    if (config.isIntentAction() && config.intentUri != null) {
+                        // Launch external app via Intent URI
+                        launchIntent(config.intentUri);
+                    } else if (config.isWebViewAction()) {
+                        // Open in WebView Activity
+                        openWebView(config.url, config.title);
+                    } else {
+                        // Default: Native player
+                        openNativePlayer(jsonConfig);
+                    }
+                    
                 } catch (Exception e) {
                     Toast.makeText(MainActivity.this, 
-                        "Error launching player: " + e.getMessage(), 
+                        "Error: " + e.getMessage(), 
                         Toast.LENGTH_SHORT).show();
                 }
             });
@@ -110,6 +131,51 @@ public class MainActivity extends AppCompatActivity {
         public boolean isAndroidApp() {
             return true;
         }
+        
+        @JavascriptInterface
+        public String getAppVersion() {
+            return "1.0.0";
+        }
+    }
+    
+    private void openNativePlayer(String jsonConfig) {
+        Intent intent = new Intent(MainActivity.this, PlayerActivity.class);
+        intent.putExtra("streamConfig", jsonConfig);
+        startActivity(intent);
+    }
+    
+    private void openWebView(String url, String title) {
+        Intent intent = new Intent(MainActivity.this, WebViewActivity.class);
+        intent.putExtra("url", url);
+        intent.putExtra("title", title != null ? title : "");
+        startActivity(intent);
+    }
+    
+    private void launchIntent(String intentUri) {
+        try {
+            Intent intent = Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME);
+            
+            // Check if app is installed
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivity(intent);
+            } else {
+                // Try to open in Play Store
+                String packageName = intent.getPackage();
+                if (packageName != null) {
+                    Intent storeIntent = new Intent(Intent.ACTION_VIEW, 
+                        Uri.parse("market://details?id=" + packageName));
+                    startActivity(storeIntent);
+                } else {
+                    showToast("Application not found");
+                }
+            }
+        } catch (Exception e) {
+            showToast("Failed to launch: " + e.getMessage());
+        }
+    }
+    
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
