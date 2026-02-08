@@ -1,20 +1,30 @@
 package app.lovable.tvplus;
 
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.PictureInPictureParams;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
 import android.util.Rational;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowManager;
-import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.ListView;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,6 +46,10 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManager;
+import androidx.media3.exoplayer.drm.DrmSessionManager;
+import androidx.media3.exoplayer.drm.HttpMediaDrmCallback;
+import androidx.media3.exoplayer.drm.FrameworkMediaDrm;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.dash.DashMediaSource;
 import androidx.media3.exoplayer.source.MediaSource;
@@ -47,20 +61,24 @@ import androidx.media3.ui.PlayerView;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Native ExoPlayer Activity with Gold & Black theme
  * Features:
- * - HLS, DASH, MP4 support with proper URL handling (preserves tokens/commas)
+ * - HLS, DASH, MP4 support with proper URL handling
  * - Custom headers (User-Agent, Referer, Cookie)
- * - ClearKey/Widevine DRM
- * - Track selection dialog (Video Quality & Audio)
+ * - Full Widevine/ClearKey DRM support
+ * - Multi-Server selection
+ * - Track selection dialog (sorted by resolution)
  * - Aspect ratio cycling
  * - Picture-in-Picture (Android O+)
- * - TV Remote navigation with focusable controls
+ * - TV Remote navigation
  */
 @OptIn(markerClass = UnstableApi.class)
 public class PlayerActivity extends AppCompatActivity {
@@ -72,6 +90,11 @@ public class PlayerActivity extends AppCompatActivity {
     private DefaultTrackSelector trackSelector;
     private StreamConfig streamConfig;
     private Gson gson = new Gson();
+    private int currentServerIndex = 0;
+    
+    // Track selection state
+    private int selectedVideoTrackIndex = -1; // -1 = Auto
+    private int selectedAudioTrackIndex = -1; // -1 = Auto
     
     // Aspect ratio modes
     private int currentResizeMode = 0;
@@ -107,6 +130,7 @@ public class PlayerActivity extends AppCompatActivity {
             Log.d(TAG, "Stream URL: " + streamConfig.url);
             Log.d(TAG, "Has headers: " + streamConfig.hasHeaders());
             Log.d(TAG, "Has DRM: " + streamConfig.hasDrm());
+            Log.d(TAG, "Has servers: " + streamConfig.hasServers());
         } catch (Exception e) {
             Log.e(TAG, "Failed to parse stream config", e);
             Toast.makeText(this, "Invalid stream configuration", Toast.LENGTH_SHORT).show();
@@ -144,7 +168,7 @@ public class PlayerActivity extends AppCompatActivity {
             backButton.setOnClickListener(v -> finish());
         }
         
-        // Resize button - cycle through aspect ratios
+        // Resize button
         ImageButton resizeButton = playerView.findViewById(R.id.exo_resize);
         if (resizeButton != null) {
             resizeButton.setOnClickListener(v -> cycleResizeMode());
@@ -156,10 +180,21 @@ public class PlayerActivity extends AppCompatActivity {
             pipButton.setOnClickListener(v -> enterPiPMode());
         }
         
-        // Settings button - Track selection dialog
+        // Settings button - Track selection
         ImageButton settingsButton = playerView.findViewById(R.id.exo_settings);
         if (settingsButton != null) {
             settingsButton.setOnClickListener(v -> showTrackSelectionDialog());
+        }
+        
+        // Server button - Multi-server selection (only show if servers available)
+        ImageButton serverButton = playerView.findViewById(R.id.exo_server);
+        if (serverButton != null) {
+            if (streamConfig.hasServers() && streamConfig.servers.size() > 1) {
+                serverButton.setVisibility(View.VISIBLE);
+                serverButton.setOnClickListener(v -> showServerSelectionDialog());
+            } else {
+                serverButton.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -189,35 +224,118 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-        if (isInPictureInPictureMode) {
-            // Hide controls in PiP
-            playerView.setUseController(false);
-        } else {
-            // Show controls when exiting PiP
-            playerView.setUseController(true);
+        playerView.setUseController(!isInPictureInPictureMode);
+    }
+
+    /**
+     * Show Multi-Server Selection Dialog
+     */
+    private void showServerSelectionDialog() {
+        if (!streamConfig.hasServers()) return;
+        
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_server_selection);
+        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        dialog.getWindow().setLayout(
+            (int)(getResources().getDisplayMetrics().widthPixels * 0.6),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        
+        RadioGroup radioGroup = dialog.findViewById(R.id.server_radio_group);
+        
+        // Populate servers
+        for (int i = 0; i < streamConfig.servers.size(); i++) {
+            StreamConfig.Server server = streamConfig.servers.get(i);
+            RadioButton rb = new RadioButton(this);
+            rb.setId(View.generateViewId());
+            rb.setText(server.name != null ? server.name : "Server " + (i + 1));
+            rb.setTextColor(Color.WHITE);
+            rb.setTextSize(16);
+            rb.setPadding(16, 24, 16, 24);
+            rb.setButtonTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700")));
+            rb.setChecked(i == currentServerIndex);
+            rb.setFocusable(true);
+            rb.setTag(i);
+            radioGroup.addView(rb);
+        }
+        
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnOk = dialog.findViewById(R.id.btn_ok);
+        
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        
+        btnOk.setOnClickListener(v -> {
+            int checkedId = radioGroup.getCheckedRadioButtonId();
+            if (checkedId != -1) {
+                RadioButton selected = dialog.findViewById(checkedId);
+                int index = (int) selected.getTag();
+                if (index != currentServerIndex) {
+                    currentServerIndex = index;
+                    switchServer(index);
+                }
+            }
+            dialog.dismiss();
+        });
+        
+        dialog.show();
+    }
+
+    private void switchServer(int index) {
+        if (index < 0 || index >= streamConfig.servers.size()) return;
+        
+        StreamConfig.Server server = streamConfig.servers.get(index);
+        streamConfig.url = server.url;
+        
+        Toast.makeText(this, "Switching to: " + (server.name != null ? server.name : "Server " + (index + 1)), Toast.LENGTH_SHORT).show();
+        
+        // Reinitialize player with new source
+        if (player != null) {
+            long position = player.getCurrentPosition();
+            player.release();
+            initializePlayer();
+            player.seekTo(position);
         }
     }
 
     /**
-     * Show track selection dialog with VIDEO and AUDIO tabs
-     * Matches the reference design with gold accent
+     * Show Track Selection Dialog with VIDEO/AUDIO tabs
+     * Sorted by resolution (highest first)
      */
     private void showTrackSelectionDialog() {
         if (player == null) return;
         
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select tracks");
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_track_selection);
+        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        dialog.getWindow().setLayout(
+            (int)(getResources().getDisplayMetrics().widthPixels * 0.6),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
         
-        // Get available tracks
+        TextView tabVideo = dialog.findViewById(R.id.tab_video);
+        TextView tabAudio = dialog.findViewById(R.id.tab_audio);
+        View tabIndicator = dialog.findViewById(R.id.tab_indicator);
+        ScrollView videoContainer = dialog.findViewById(R.id.video_container);
+        ScrollView audioContainer = dialog.findViewById(R.id.audio_container);
+        RadioGroup videoRadioGroup = dialog.findViewById(R.id.video_radio_group);
+        RadioGroup audioRadioGroup = dialog.findViewById(R.id.audio_radio_group);
+        Button btnCancel = dialog.findViewById(R.id.btn_cancel);
+        Button btnOk = dialog.findViewById(R.id.btn_ok);
+        
+        // Set indicator width to half
+        tabIndicator.post(() -> {
+            ViewGroup.LayoutParams params = tabIndicator.getLayoutParams();
+            params.width = tabVideo.getWidth();
+            tabIndicator.setLayoutParams(params);
+        });
+        
+        // Collect tracks
         Tracks tracks = player.getCurrentTracks();
-        List<String> videoTracks = new ArrayList<>();
-        List<String> audioTracks = new ArrayList<>();
-        List<TrackGroup> videoGroups = new ArrayList<>();
-        List<TrackGroup> audioGroups = new ArrayList<>();
-        List<Integer> videoIndexes = new ArrayList<>();
-        List<Integer> audioIndexes = new ArrayList<>();
+        List<TrackInfo> videoTracks = new ArrayList<>();
+        List<TrackInfo> audioTracks = new ArrayList<>();
         
-        // Populate track lists
         for (Tracks.Group trackGroup : tracks.getGroups()) {
             TrackGroup group = trackGroup.getMediaTrackGroup();
             int trackType = trackGroup.getType();
@@ -230,142 +348,214 @@ public class PlayerActivity extends AppCompatActivity {
                     if (format.bitrate > 0) {
                         label += ", " + String.format("%.2f Mbps", format.bitrate / 1000000f);
                     }
-                    videoTracks.add(label);
-                    videoGroups.add(group);
-                    videoIndexes.add(i);
+                    videoTracks.add(new TrackInfo(label, group, i, format.height, format.bitrate));
                 } else if (trackType == C.TRACK_TYPE_AUDIO) {
-                    String label = format.language != null ? format.language : "Audio";
-                    if (format.label != null) {
-                        label = format.label;
-                    }
+                    String label = format.label != null ? format.label : 
+                                   (format.language != null ? format.language : "Audio");
                     if (format.bitrate > 0) {
                         label += " (" + (format.bitrate / 1000) + " kbps)";
                     }
-                    audioTracks.add(label);
-                    audioGroups.add(group);
-                    audioIndexes.add(i);
+                    audioTracks.add(new TrackInfo(label, group, i, 0, format.bitrate));
                 }
             }
         }
         
-        // Create dialog items
-        List<String> items = new ArrayList<>();
-        items.add("── VIDEO ──");
-        items.add("Auto");
-        items.addAll(videoTracks);
-        items.add("");
-        items.add("── AUDIO ──");
-        items.add("Auto");
-        items.addAll(audioTracks);
+        // Sort video tracks by resolution (highest first)
+        Collections.sort(videoTracks, (a, b) -> {
+            if (b.height != a.height) return b.height - a.height;
+            return b.bitrate - a.bitrate;
+        });
         
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, 
-            android.R.layout.simple_list_item_1, items);
+        // Populate video tracks
+        // Add "None" option
+        RadioButton rbNone = createRadioButton("None", -2, selectedVideoTrackIndex == -2);
+        videoRadioGroup.addView(rbNone);
         
-        ListView listView = new ListView(this);
-        listView.setAdapter(adapter);
+        // Add "Auto" option
+        RadioButton rbAuto = createRadioButton("Auto", -1, selectedVideoTrackIndex == -1);
+        videoRadioGroup.addView(rbAuto);
         
-        final int videoOffset = 2; // After header and Auto
-        final int audioOffset = videoOffset + videoTracks.size() + 3; // After video section, space, header, Auto
+        for (int i = 0; i < videoTracks.size(); i++) {
+            TrackInfo track = videoTracks.get(i);
+            RadioButton rb = createRadioButton(track.label, i, selectedVideoTrackIndex == i);
+            rb.setTag(R.id.tab_video, track);
+            videoRadioGroup.addView(rb);
+        }
         
-        builder.setView(listView);
-        AlertDialog dialog = builder.create();
+        // Populate audio tracks
+        RadioButton rbAudioAuto = createRadioButton("Auto", -1, selectedAudioTrackIndex == -1);
+        audioRadioGroup.addView(rbAudioAuto);
         
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            if (position == 0 || position == videoOffset + videoTracks.size() || 
-                position == videoOffset + videoTracks.size() + 1) {
-                // Header or spacer - ignore
-                return;
+        for (int i = 0; i < audioTracks.size(); i++) {
+            TrackInfo track = audioTracks.get(i);
+            RadioButton rb = createRadioButton(track.label, i, selectedAudioTrackIndex == i);
+            rb.setTag(R.id.tab_audio, track);
+            audioRadioGroup.addView(rb);
+        }
+        
+        // Tab switching
+        final List<TrackInfo> finalVideoTracks = videoTracks;
+        final List<TrackInfo> finalAudioTracks = audioTracks;
+        
+        tabVideo.setOnClickListener(v -> {
+            tabVideo.setTextColor(Color.parseColor("#FFD700"));
+            tabAudio.setTextColor(Color.parseColor("#888888"));
+            videoContainer.setVisibility(View.VISIBLE);
+            audioContainer.setVisibility(View.GONE);
+            animateIndicator(tabIndicator, 0);
+        });
+        
+        tabAudio.setOnClickListener(v -> {
+            tabAudio.setTextColor(Color.parseColor("#FFD700"));
+            tabVideo.setTextColor(Color.parseColor("#888888"));
+            audioContainer.setVisibility(View.VISIBLE);
+            videoContainer.setVisibility(View.GONE);
+            animateIndicator(tabIndicator, tabVideo.getWidth());
+        });
+        
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        
+        btnOk.setOnClickListener(v -> {
+            // Apply video track selection
+            int videoCheckedId = videoRadioGroup.getCheckedRadioButtonId();
+            if (videoCheckedId != -1) {
+                RadioButton videoRb = dialog.findViewById(videoCheckedId);
+                int index = (int) videoRb.getTag();
+                selectedVideoTrackIndex = index;
+                
+                if (index == -2) {
+                    // Disable video
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
+                            .build()
+                    );
+                } else if (index == -1) {
+                    // Auto
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
+                            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+                            .build()
+                    );
+                } else if (index < finalVideoTracks.size()) {
+                    TrackInfo track = finalVideoTracks.get(index);
+                    TrackSelectionOverride override = new TrackSelectionOverride(
+                        track.group, List.of(track.formatIndex));
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
+                            .addOverride(override)
+                            .build()
+                    );
+                }
             }
             
-            if (position == 1) {
-                // Video Auto
-                trackSelector.setParameters(
-                    trackSelector.buildUponParameters()
-                        .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
-                        .build()
-                );
-                Toast.makeText(this, "Video: Auto", Toast.LENGTH_SHORT).show();
-            } else if (position > 1 && position < videoOffset + videoTracks.size()) {
-                // Specific video track
-                int trackIndex = position - videoOffset;
-                if (trackIndex >= 0 && trackIndex < videoGroups.size()) {
-                    TrackGroup group = videoGroups.get(trackIndex);
-                    int formatIndex = videoIndexes.get(trackIndex);
+            // Apply audio track selection
+            int audioCheckedId = audioRadioGroup.getCheckedRadioButtonId();
+            if (audioCheckedId != -1) {
+                RadioButton audioRb = dialog.findViewById(audioCheckedId);
+                int index = (int) audioRb.getTag();
+                selectedAudioTrackIndex = index;
+                
+                if (index == -1) {
+                    // Auto
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters()
+                            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                            .build()
+                    );
+                } else if (index < finalAudioTracks.size()) {
+                    TrackInfo track = finalAudioTracks.get(index);
                     TrackSelectionOverride override = new TrackSelectionOverride(
-                        group, List.of(formatIndex));
+                        track.group, List.of(track.formatIndex));
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .addOverride(override)
                             .build()
                     );
-                    Toast.makeText(this, "Video: " + videoTracks.get(trackIndex), Toast.LENGTH_SHORT).show();
-                }
-            } else if (position == audioOffset - 1) {
-                // Audio Auto
-                trackSelector.setParameters(
-                    trackSelector.buildUponParameters()
-                        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                        .build()
-                );
-                Toast.makeText(this, "Audio: Auto", Toast.LENGTH_SHORT).show();
-            } else if (position >= audioOffset) {
-                // Specific audio track
-                int trackIndex = position - audioOffset;
-                if (trackIndex >= 0 && trackIndex < audioGroups.size()) {
-                    TrackGroup group = audioGroups.get(trackIndex);
-                    int formatIndex = audioIndexes.get(trackIndex);
-                    TrackSelectionOverride override = new TrackSelectionOverride(
-                        group, List.of(formatIndex));
-                    trackSelector.setParameters(
-                        trackSelector.buildUponParameters()
-                            .addOverride(override)
-                            .build()
-                    );
-                    Toast.makeText(this, "Audio: " + audioTracks.get(trackIndex), Toast.LENGTH_SHORT).show();
                 }
             }
             
             dialog.dismiss();
         });
         
-        builder.setNegativeButton("Cancel", null);
         dialog.show();
+    }
+    
+    private RadioButton createRadioButton(String text, int index, boolean checked) {
+        RadioButton rb = new RadioButton(this);
+        rb.setId(View.generateViewId());
+        rb.setText(text);
+        rb.setTextColor(index < 0 ? Color.BLACK : Color.parseColor("#666666"));
+        rb.setTextSize(16);
+        rb.setPadding(16, 20, 16, 20);
+        rb.setButtonTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700")));
+        rb.setChecked(checked);
+        rb.setFocusable(true);
+        rb.setTag(index);
+        return rb;
+    }
+    
+    private void animateIndicator(View indicator, float translationX) {
+        indicator.animate()
+            .translationX(translationX)
+            .setDuration(200)
+            .start();
+    }
+    
+    private static class TrackInfo {
+        String label;
+        TrackGroup group;
+        int formatIndex;
+        int height;
+        int bitrate;
+        
+        TrackInfo(String label, TrackGroup group, int formatIndex, int height, int bitrate) {
+            this.label = label;
+            this.group = group;
+            this.formatIndex = formatIndex;
+            this.height = height;
+            this.bitrate = bitrate;
+        }
     }
 
     private void initializePlayer() {
         // Build data source factory with custom headers
         DataSource.Factory dataSourceFactory = buildDataSourceFactory();
         
-        // Create track selector for quality switching
+        // Create track selector
         trackSelector = new DefaultTrackSelector(this);
         trackSelector.setParameters(
             trackSelector.buildUponParameters()
-                .setMaxVideoSizeSd() // Start with SD for faster loading
+                .setMaxVideoSizeSd()
                 .build()
         );
         
-        // Build player with track selector
+        // Build player
         player = new ExoPlayer.Builder(this)
             .setTrackSelector(trackSelector)
             .build();
         
         playerView.setPlayer(player);
         
-        // Build media source
+        // Build media source with DRM if configured
         MediaSource mediaSource = buildMediaSource(dataSourceFactory);
         
-        // Add error listener
+        // Add listener
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
                 Log.e(TAG, "Playback error: " + error.getMessage(), error);
                 String errorMsg = "Playback error";
                 if (error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) {
-                    errorMsg = "Network error - check connection";
+                    errorMsg = "Network error";
                 } else if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
-                    errorMsg = "Stream unavailable (HTTP error)";
-                } else if (error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED) {
-                    errorMsg = "Invalid stream format";
+                    errorMsg = "Stream unavailable";
+                } else if (error.errorCode == PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED) {
+                    errorMsg = "DRM license failed";
+                } else if (error.errorCode == PlaybackException.ERROR_CODE_DRM_SCHEME_UNSUPPORTED) {
+                    errorMsg = "DRM not supported";
                 }
                 Toast.makeText(PlayerActivity.this, errorMsg, Toast.LENGTH_LONG).show();
             }
@@ -373,20 +563,15 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_READY) {
-                    Log.d(TAG, "Playback ready");
-                    // Allow higher quality now
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .clearVideoSizeConstraints()
                             .build()
                     );
-                } else if (playbackState == Player.STATE_ENDED) {
-                    Log.d(TAG, "Playback ended");
                 }
             }
         });
         
-        // Prepare and play
         player.setMediaSource(mediaSource);
         player.prepare();
         player.setPlayWhenReady(true);
@@ -395,43 +580,35 @@ public class PlayerActivity extends AppCompatActivity {
     private DataSource.Factory buildDataSourceFactory() {
         DefaultHttpDataSource.Factory factory = new DefaultHttpDataSource.Factory();
         
-        // Set generous timeouts for slow streams
         factory.setConnectTimeoutMs(30000);
         factory.setReadTimeoutMs(30000);
         factory.setAllowCrossProtocolRedirects(true);
         
-        // Apply custom headers if present
         if (streamConfig.hasHeaders()) {
             Map<String, String> headers = new HashMap<>();
             
             if (!streamConfig.getUserAgent().isEmpty()) {
                 factory.setUserAgent(streamConfig.getUserAgent());
-                Log.d(TAG, "Setting User-Agent: " + streamConfig.getUserAgent());
             } else {
-                // Default User-Agent for compatibility
                 factory.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
             }
             
             if (!streamConfig.getReferer().isEmpty()) {
                 headers.put("Referer", streamConfig.getReferer());
-                Log.d(TAG, "Setting Referer: " + streamConfig.getReferer());
             }
             
             if (!streamConfig.getCookie().isEmpty()) {
                 headers.put("Cookie", streamConfig.getCookie());
-                Log.d(TAG, "Setting Cookie: " + streamConfig.getCookie());
             }
             
             if (!streamConfig.getOrigin().isEmpty()) {
                 headers.put("Origin", streamConfig.getOrigin());
-                Log.d(TAG, "Setting Origin: " + streamConfig.getOrigin());
             }
             
             if (!headers.isEmpty()) {
                 factory.setDefaultRequestProperties(headers);
             }
         } else {
-            // Default User-Agent even without custom headers
             factory.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
         }
         
@@ -439,31 +616,47 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private MediaSource buildMediaSource(DataSource.Factory dataSourceFactory) {
-        // CRITICAL: Preserve URL exactly as provided - DO NOT strip tokens, commas, or parameters
         String url = streamConfig.url;
-        Log.d(TAG, "Building media source for URL: " + url);
+        Log.d(TAG, "Building media source for: " + url);
         
-        // Use Uri.parse which properly handles complex URLs with tokens
         Uri uri = Uri.parse(url);
         
-        // Build MediaItem
-        MediaItem.Builder mediaItemBuilder = new MediaItem.Builder()
-            .setUri(uri);
+        // Build MediaItem with DRM configuration
+        MediaItem.Builder mediaItemBuilder = new MediaItem.Builder().setUri(uri);
         
-        // Apply DRM if configured
         if (streamConfig.hasDrm() && streamConfig.drm != null) {
-            MediaItem.DrmConfiguration.Builder drmBuilder;
-            
             String scheme = streamConfig.drm.scheme != null ? 
                 streamConfig.drm.scheme.toLowerCase() : "clearkey";
             
             Log.d(TAG, "Configuring DRM: " + scheme);
             
+            MediaItem.DrmConfiguration.Builder drmBuilder;
+            
             if ("widevine".equals(scheme)) {
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID);
+                
                 if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
+                    Log.d(TAG, "Widevine License URL: " + streamConfig.drm.licenseUrl);
                 }
+                
+                // Add license headers if present
+                if (streamConfig.hasHeaders()) {
+                    Map<String, String> licenseHeaders = new HashMap<>();
+                    if (!streamConfig.getUserAgent().isEmpty()) {
+                        licenseHeaders.put("User-Agent", streamConfig.getUserAgent());
+                    }
+                    if (!streamConfig.getOrigin().isEmpty()) {
+                        licenseHeaders.put("Origin", streamConfig.getOrigin());
+                    }
+                    if (!streamConfig.getReferer().isEmpty()) {
+                        licenseHeaders.put("Referer", streamConfig.getReferer());
+                    }
+                    if (!licenseHeaders.isEmpty()) {
+                        drmBuilder.setLicenseRequestHeaders(licenseHeaders);
+                    }
+                }
+                
             } else if ("playready".equals(scheme)) {
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.PLAYREADY_UUID);
                 if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
@@ -473,7 +666,6 @@ public class PlayerActivity extends AppCompatActivity {
                 // ClearKey
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID);
                 
-                // Build ClearKey JSON if keyId and key are provided
                 if (streamConfig.drm.keyId != null && !streamConfig.drm.keyId.isEmpty() &&
                     streamConfig.drm.key != null && !streamConfig.drm.key.isEmpty()) {
                     String clearKeyJson = buildClearKeyJson(
@@ -494,8 +686,7 @@ public class PlayerActivity extends AppCompatActivity {
         
         MediaItem mediaItem = mediaItemBuilder.build();
         
-        // Detect stream type and build appropriate source
-        // Check URL path and full URL for format indicators
+        // Detect format
         String lowerUrl = url.toLowerCase();
         
         if (lowerUrl.contains(".m3u8") || lowerUrl.contains("/hls/") || lowerUrl.contains("format=m3u8")) {
@@ -508,14 +699,13 @@ public class PlayerActivity extends AppCompatActivity {
             return new DashMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);
         } else {
-            Log.d(TAG, "Building Progressive source (MP4/other)");
+            Log.d(TAG, "Building Progressive source");
             return new ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);
         }
     }
 
     private String buildClearKeyJson(String keyId, String key) {
-        // Convert hex to base64url
         String keyIdB64 = hexToBase64Url(keyId);
         String keyB64 = hexToBase64Url(key);
         
@@ -526,7 +716,6 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private String hexToBase64Url(String hex) {
-        // Remove any spaces, colons, or dashes
         hex = hex.replaceAll("[:\\s\\-]", "");
         
         int len = hex.length();
@@ -536,7 +725,6 @@ public class PlayerActivity extends AppCompatActivity {
                 + Character.digit(hex.charAt(i + 1), 16));
         }
         
-        // Base64URL encoding (no padding, url-safe)
         return Base64.encodeToString(data, Base64.NO_WRAP | Base64.URL_SAFE | Base64.NO_PADDING);
     }
 

@@ -185,6 +185,22 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
+            <!-- Server Selection Button (Multi-Server) -->
+            <ImageButton
+                android:id="@+id/exo_server"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/btn_secondary_focus_selector"
+                android:contentDescription="Select Server"
+                android:src="@drawable/ic_server"
+                android:tint="@android:color/white"
+                android:padding="10dp"
+                android:focusable="true"
+                android:visibility="gone"
+                android:nextFocusRight="@id/exo_settings"
+                android:nextFocusUp="@id/exo_progress" />
+
             <!-- Settings Button (Track Selection) -->
             <ImageButton
                 android:id="@+id/exo_settings"
@@ -197,7 +213,7 @@
                 android:tint="@android:color/white"
                 android:padding="10dp"
                 android:focusable="true"
-                android:nextFocusLeft="@id/exo_ffwd"
+                android:nextFocusLeft="@id/exo_server"
                 android:nextFocusRight="@id/exo_resize"
                 android:nextFocusUp="@id/exo_progress" />
 
