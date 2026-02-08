@@ -346,7 +346,7 @@ public class PlayerActivity extends AppCompatActivity {
                 } else {
                     TrackInfo track = subtitleTracks.get(which - 1);
                     TrackSelectionOverride override = new TrackSelectionOverride(
-                        track.group, List.of(track.formatIndex));
+                        track.group, Collections.singletonList(track.formatIndex));
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
@@ -514,10 +514,12 @@ public class PlayerActivity extends AppCompatActivity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(R.layout.dialog_track_selection);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        dialog.getWindow().setLayout(
-            (int)(getResources().getDisplayMetrics().widthPixels * 0.6),
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
+        
+        // Calculate dialog size - width 60%, height max 70% of screen
+        int dialogWidth = (int)(getResources().getDisplayMetrics().widthPixels * 0.6);
+        int maxDialogHeight = (int)(getResources().getDisplayMetrics().heightPixels * 0.7);
+        
+        dialog.getWindow().setLayout(dialogWidth, maxDialogHeight);
         
         TextView tabVideo = dialog.findViewById(R.id.tab_video);
         TextView tabAudio = dialog.findViewById(R.id.tab_audio);
@@ -646,7 +648,7 @@ public class PlayerActivity extends AppCompatActivity {
                 } else if (index < finalVideoTracks.size()) {
                     TrackInfo track = finalVideoTracks.get(index);
                     TrackSelectionOverride override = new TrackSelectionOverride(
-                        track.group, List.of(track.formatIndex));
+                        track.group, Collections.singletonList(track.formatIndex));
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
@@ -673,7 +675,7 @@ public class PlayerActivity extends AppCompatActivity {
                 } else if (index < finalAudioTracks.size()) {
                     TrackInfo track = finalAudioTracks.get(index);
                     TrackSelectionOverride override = new TrackSelectionOverride(
-                        track.group, List.of(track.formatIndex));
+                        track.group, Collections.singletonList(track.formatIndex));
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .addOverride(override)
