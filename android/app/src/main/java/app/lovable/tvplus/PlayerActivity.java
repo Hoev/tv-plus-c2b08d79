@@ -54,20 +54,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
-import androidx.mediarouter.app.MediaRouteActionProvider;
-import androidx.mediarouter.app.MediaRouteButton;
-import androidx.mediarouter.media.MediaControlIntent;
-import androidx.mediarouter.media.MediaRouteSelector;
-import androidx.mediarouter.media.MediaRouter;
 
-import com.google.android.gms.cast.MediaInfo;
-import com.google.android.gms.cast.MediaLoadRequestData;
-import com.google.android.gms.cast.framework.CastButtonFactory;
-import com.google.android.gms.cast.framework.CastContext;
-import com.google.android.gms.cast.framework.CastSession;
-import com.google.android.gms.cast.framework.SessionManager;
-import com.google.android.gms.cast.framework.SessionManagerListener;
-import com.google.android.gms.cast.framework.media.RemoteMediaClient;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -101,12 +88,6 @@ public class PlayerActivity extends AppCompatActivity {
     private Gson gson = new Gson();
     private int currentServerIndex = 0;
     
-    // Chromecast
-    private CastContext castContext;
-    private CastSession castSession;
-    private SessionManager sessionManager;
-    private SessionManagerListener<CastSession> sessionManagerListener;
-    
     // Track selection state
     private int selectedVideoTrackIndex = -1; // -1 = Auto
     private int selectedAudioTrackIndex = -1; // -1 = Auto
@@ -131,9 +112,6 @@ public class PlayerActivity extends AppCompatActivity {
         setContentView(R.layout.activity_player);
         
         playerView = findViewById(R.id.playerView);
-        
-        // Initialize Chromecast
-        initializeCast();
         
         // Parse stream config from intent
         String configJson = getIntent().getStringExtra("streamConfig");
@@ -160,94 +138,6 @@ public class PlayerActivity extends AppCompatActivity {
         initializePlayer();
     }
     
-    private void initializeCast() {
-        try {
-            castContext = CastContext.getSharedInstance(this);
-            sessionManager = castContext.getSessionManager();
-            
-            sessionManagerListener = new SessionManagerListener<CastSession>() {
-                @Override
-                public void onSessionStarting(@NonNull CastSession session) {}
-                
-                @Override
-                public void onSessionStarted(@NonNull CastSession session, @NonNull String sessionId) {
-                    castSession = session;
-                    Log.d(TAG, "Cast session started");
-                    castCurrentMedia();
-                }
-                
-                @Override
-                public void onSessionStartFailed(@NonNull CastSession session, int error) {
-                    Log.e(TAG, "Cast session start failed: " + error);
-                }
-                
-                @Override
-                public void onSessionEnding(@NonNull CastSession session) {}
-                
-                @Override
-                public void onSessionEnded(@NonNull CastSession session, int error) {
-                    castSession = null;
-                    Log.d(TAG, "Cast session ended");
-                    if (player != null) {
-                        player.setPlayWhenReady(true);
-                    }
-                }
-                
-                @Override
-                public void onSessionResuming(@NonNull CastSession session, @NonNull String sessionId) {}
-                
-                @Override
-                public void onSessionResumed(@NonNull CastSession session, boolean wasSuspended) {
-                    castSession = session;
-                }
-                
-                @Override
-                public void onSessionSuspended(@NonNull CastSession session, int reason) {}
-            };
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize Cast", e);
-        }
-    }
-    
-    private void castCurrentMedia() {
-        if (castSession == null || streamConfig == null) return;
-        
-        try {
-            RemoteMediaClient remoteMediaClient = castSession.getRemoteMediaClient();
-            if (remoteMediaClient == null) return;
-            
-            // Pause local playback
-            if (player != null) {
-                player.setPlayWhenReady(false);
-            }
-            
-            // Build cast media info
-            String contentType = MimeTypes.APPLICATION_M3U8;
-            String url = streamConfig.url.toLowerCase();
-            if (url.contains(".mpd")) {
-                contentType = MimeTypes.APPLICATION_MPD;
-            } else if (url.contains(".mp4")) {
-                contentType = MimeTypes.VIDEO_MP4;
-            }
-            
-            MediaInfo mediaInfo = new MediaInfo.Builder(streamConfig.url)
-                .setStreamType(MediaInfo.STREAM_TYPE_LIVE)
-                .setContentType(contentType)
-                .build();
-            
-            MediaLoadRequestData loadRequest = new MediaLoadRequestData.Builder()
-                .setMediaInfo(mediaInfo)
-                .setAutoplay(true)
-                .build();
-            
-            remoteMediaClient.load(loadRequest);
-            Toast.makeText(this, "Casting to " + castSession.getCastDevice().getFriendlyName(), Toast.LENGTH_SHORT).show();
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to cast media", e);
-        }
-    }
-
     private void enableFullscreen() {
         getWindow().setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
@@ -286,19 +176,16 @@ public class PlayerActivity extends AppCompatActivity {
             subtitleButton.setOnClickListener(v -> showSubtitleSelectionDialog());
         }
         
-        // Cast button - Chromecast (standard MediaRouteButton wiring)
-        MediaRouteButton castButton = playerView.findViewById(R.id.exo_cast);
-        if (castButton != null) {
-            try {
-                CastButtonFactory.setUpMediaRouteButton(getApplicationContext(), castButton);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to setup Cast button", e);
-            }
-        }
-        
         // Server button - Multi-server selection (only show if servers available)
         ImageButton serverButton = playerView.findViewById(R.id.exo_server);
         if (serverButton != null) {
+            if (streamConfig.hasServers() && streamConfig.servers.size() > 1) {
+                serverButton.setVisibility(View.VISIBLE);
+                serverButton.setOnClickListener(v -> showServerSelectionDialog());
+            } else {
+                serverButton.setVisibility(View.GONE);
+            }
+        }
             if (streamConfig.hasServers() && streamConfig.servers.size() > 1) {
                 serverButton.setVisibility(View.VISIBLE);
                 serverButton.setOnClickListener(v -> showServerSelectionDialog());
@@ -905,10 +792,7 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (sessionManager != null && sessionManagerListener != null) {
-            sessionManager.addSessionManagerListener(sessionManagerListener, CastSession.class);
-        }
-        if (player != null && castSession == null) {
+        if (player != null) {
             player.setPlayWhenReady(true);
         }
     }
@@ -916,9 +800,6 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (sessionManager != null && sessionManagerListener != null) {
-            sessionManager.removeSessionManagerListener(sessionManagerListener, CastSession.class);
-        }
         if (player != null && !checkPipMode()) {
             player.setPlayWhenReady(false);
         }
