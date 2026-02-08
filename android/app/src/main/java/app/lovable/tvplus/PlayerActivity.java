@@ -68,10 +68,9 @@ import java.util.Map;
  * Features:
  * - HLS, DASH, MP4 support with proper URL handling
  * - Custom headers (User-Agent, Referer, Cookie)
- * - Full Widevine/ClearKey DRM support
+ * - Full Widevine/ClearKey DRM support (including combined KeyID:Key format)
  * - Multi-Server selection
  * - Track selection dialog (sorted by resolution)
- * - Chromecast support
  * - Aspect ratio cycling
  * - Picture-in-Picture (Android O+)
  * - TV Remote navigation
@@ -152,6 +151,12 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void setupUI() {
+        // Back/Exit button
+        ImageButton backButton = playerView.findViewById(R.id.exo_back);
+        if (backButton != null) {
+            backButton.setOnClickListener(v -> finish());
+        }
+        
         // Resize button
         ImageButton resizeButton = playerView.findViewById(R.id.exo_resize);
         if (resizeButton != null) {
@@ -240,14 +245,6 @@ public class PlayerActivity extends AppCompatActivity {
                 }
             })
             .show();
-    }
-    
-    /**
-     * Cast device selection is handled by the MediaRouteButton (exo_cast).
-     * Keeping this method as a safe no-op to avoid build/runtime issues.
-     */
-    private void showCastDialog() {
-        Toast.makeText(this, "Use the Cast button", Toast.LENGTH_SHORT).show();
     }
 
     private void cycleResizeMode() {
@@ -352,7 +349,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     /**
      * Show Track Selection Dialog with VIDEO/AUDIO tabs
-     * Sorted by resolution (highest first)
+     * Dark theme with gold accents, sorted by resolution (highest first)
      */
     private void showTrackSelectionDialog() {
         if (player == null) return;
@@ -362,9 +359,9 @@ public class PlayerActivity extends AppCompatActivity {
         dialog.setContentView(R.layout.dialog_track_selection);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         
-        // Calculate dialog size - width 60%, height max 70% of screen
+        // Calculate dialog size - width 60%, height max 75% of screen
         int dialogWidth = (int)(getResources().getDisplayMetrics().widthPixels * 0.6);
-        int maxDialogHeight = (int)(getResources().getDisplayMetrics().heightPixels * 0.7);
+        int maxDialogHeight = (int)(getResources().getDisplayMetrics().heightPixels * 0.75);
         
         dialog.getWindow().setLayout(dialogWidth, maxDialogHeight);
         
@@ -420,40 +417,40 @@ public class PlayerActivity extends AppCompatActivity {
             return b.bitrate - a.bitrate;
         });
         
-        // Populate video tracks
+        // Populate video tracks (dark theme - white text)
         // Add "None" option
-        RadioButton rbNone = createRadioButton("None", -2, selectedVideoTrackIndex == -2);
+        RadioButton rbNone = createDarkRadioButton("None", -2, selectedVideoTrackIndex == -2);
         videoRadioGroup.addView(rbNone);
         
         // Add "Auto" option
-        RadioButton rbAuto = createRadioButton("Auto", -1, selectedVideoTrackIndex == -1);
-        videoRadioGroup.addView(rbAuto);
+        RadioButton rbAuto = createDarkRadioButton("Auto", -1, selectedVideoTrackIndex == -1);
+        audioRadioGroup.addView(rbAuto);
         
         for (int i = 0; i < videoTracks.size(); i++) {
             TrackInfo track = videoTracks.get(i);
-            RadioButton rb = createRadioButton(track.label, i, selectedVideoTrackIndex == i);
+            RadioButton rb = createDarkRadioButton(track.label, i, selectedVideoTrackIndex == i);
             rb.setTag(R.id.tab_video, track);
             videoRadioGroup.addView(rb);
         }
         
-        // Populate audio tracks
-        RadioButton rbAudioAuto = createRadioButton("Auto", -1, selectedAudioTrackIndex == -1);
+        // Populate audio tracks (dark theme - white text)
+        RadioButton rbAudioAuto = createDarkRadioButton("Auto", -1, selectedAudioTrackIndex == -1);
         audioRadioGroup.addView(rbAudioAuto);
         
         for (int i = 0; i < audioTracks.size(); i++) {
             TrackInfo track = audioTracks.get(i);
-            RadioButton rb = createRadioButton(track.label, i, selectedAudioTrackIndex == i);
+            RadioButton rb = createDarkRadioButton(track.label, i, selectedAudioTrackIndex == i);
             rb.setTag(R.id.tab_audio, track);
             audioRadioGroup.addView(rb);
         }
         
-        // Tab switching
+        // Tab switching with gold animation
         final List<TrackInfo> finalVideoTracks = videoTracks;
         final List<TrackInfo> finalAudioTracks = audioTracks;
         
         tabVideo.setOnClickListener(v -> {
             tabVideo.setTextColor(Color.parseColor("#FFD700"));
-            tabAudio.setTextColor(Color.parseColor("#888888"));
+            tabAudio.setTextColor(Color.parseColor("#666666"));
             videoContainer.setVisibility(View.VISIBLE);
             audioContainer.setVisibility(View.GONE);
             animateIndicator(tabIndicator, 0);
@@ -461,7 +458,7 @@ public class PlayerActivity extends AppCompatActivity {
         
         tabAudio.setOnClickListener(v -> {
             tabAudio.setTextColor(Color.parseColor("#FFD700"));
-            tabVideo.setTextColor(Color.parseColor("#888888"));
+            tabVideo.setTextColor(Color.parseColor("#666666"));
             audioContainer.setVisibility(View.VISIBLE);
             videoContainer.setVisibility(View.GONE);
             animateIndicator(tabIndicator, tabVideo.getWidth());
@@ -537,13 +534,16 @@ public class PlayerActivity extends AppCompatActivity {
         dialog.show();
     }
     
-    private RadioButton createRadioButton(String text, int index, boolean checked) {
+    /**
+     * Create a radio button with dark theme styling (white text on dark background)
+     */
+    private RadioButton createDarkRadioButton(String text, int index, boolean checked) {
         RadioButton rb = new RadioButton(this);
         rb.setId(View.generateViewId());
         rb.setText(text);
-        rb.setTextColor(index < 0 ? Color.BLACK : Color.parseColor("#666666"));
+        rb.setTextColor(Color.WHITE);
         rb.setTextSize(16);
-        rb.setPadding(16, 20, 16, 20);
+        rb.setPadding(16, 24, 16, 24);
         rb.setButtonTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FFD700")));
         rb.setChecked(checked);
         rb.setFocusable(true);
@@ -717,21 +717,31 @@ public class PlayerActivity extends AppCompatActivity {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                 }
             } else {
-                // ClearKey
+                // ClearKey - supports keyId:key format, separate fields, or license URL
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID);
                 
-                if (streamConfig.drm.keyId != null && !streamConfig.drm.keyId.isEmpty() &&
-                    streamConfig.drm.key != null && !streamConfig.drm.key.isEmpty()) {
-                    String clearKeyJson = buildClearKeyJson(
-                        streamConfig.drm.keyId, 
-                        streamConfig.drm.key
-                    );
+                String keyId = streamConfig.drm.keyId;
+                String key = streamConfig.drm.key;
+                
+                // Check if we have combined keyId:key format in keyId field
+                if (keyId != null && keyId.contains(":") && (key == null || key.isEmpty())) {
+                    String[] parts = keyId.split(":");
+                    if (parts.length == 2) {
+                        keyId = parts[0];
+                        key = parts[1];
+                        Log.d(TAG, "Parsed combined ClearKey format");
+                    }
+                }
+                
+                if (keyId != null && !keyId.isEmpty() && key != null && !key.isEmpty()) {
+                    String clearKeyJson = buildClearKeyJson(keyId, key);
                     String dataUri = "data:application/json;base64," + 
                         Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
                     drmBuilder.setLicenseUri(dataUri);
-                    Log.d(TAG, "ClearKey configured");
+                    Log.d(TAG, "ClearKey configured with keyId:key");
                 } else if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
+                    Log.d(TAG, "ClearKey configured with license URL");
                 }
             }
             

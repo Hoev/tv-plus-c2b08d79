@@ -6,7 +6,7 @@ import { useClock } from '@/hooks/useClock';
 import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
 import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
 import { isAndroidApp, sendToAndroid, buildAndroidStreamConfig } from '@/lib/androidBridge';
-import type { Channel, StreamConfig, SubChannel } from '@/types/admin';
+import type { Channel, StreamConfig, SubChannel, AndroidStreamConfig } from '@/types/admin';
 import type { PlayerType } from '@/types/admin';
 
 const SETTINGS_ID = '__settings';
@@ -182,49 +182,124 @@ const Index = () => {
     return undefined;
   }, []);
 
-  // Open player
-  const openFromStreamConfig = useCallback((stream: StreamConfig | undefined, title: string, preferredPlayer?: PlayerType) => {
-    if (!stream?.url) {
-      alert('لا يوجد رابط بث لهذه القناة.');
-      return;
+  // Open player - uses Android-specific config when running in Android app
+  const openFromStreamConfig = useCallback((
+    webStream: StreamConfig | undefined, 
+    title: string, 
+    preferredPlayer?: PlayerType,
+    androidConfig?: {
+      url?: string;
+      actionType?: 'native' | 'webview' | 'intent';
+      headers?: {
+        userAgent?: string;
+        referrer?: string;
+        cookie?: string;
+        origin?: string;
+      };
+      intentUri?: string;
+      drmLicenseUrl?: string;
+      drmScheme?: 'widevine' | 'clearkey' | 'playready';
+      drmKeyId?: string;
+      drmKey?: string;
+      servers?: Array<{ name: string; url: string }>;
     }
-
-    const drm = buildDrmString(stream.drm);
-
-    // Check if running in Android app - use native player
+  ) => {
+    // Check if running in Android app - use Android-specific config
     if (isAndroidApp()) {
-      const androidConfig = buildAndroidStreamConfig(title, {
-        url: stream.url,
-        headers: {
-          userAgent: stream.userAgent,
-          referrer: stream.referrer,
-          cookie: stream.cookies,
+      // Use Android config if available, otherwise fall back to web stream
+      const streamUrl = androidConfig?.url || webStream?.url;
+      
+      if (!streamUrl) {
+        alert('لا يوجد رابط بث لهذه القناة.');
+        return;
+      }
+      
+      const streamData = buildAndroidStreamConfig(title, {
+        url: streamUrl,
+        actionType: androidConfig?.actionType || 'native',
+        headers: androidConfig?.headers || {
+          userAgent: webStream?.userAgent,
+          referrer: webStream?.referrer,
+          cookie: webStream?.cookies,
         },
+        intentUri: androidConfig?.intentUri,
+        drmLicenseUrl: androidConfig?.drmLicenseUrl,
+        drmScheme: androidConfig?.drmScheme,
+        drmKeyId: androidConfig?.drmKeyId,
+        drmKey: androidConfig?.drmKey,
+        servers: androidConfig?.servers,
       });
       
-      if (sendToAndroid(androidConfig)) {
+      if (sendToAndroid(streamData)) {
         return; // Successfully sent to Android native player
       }
     }
 
-    // Fallback to web player
+    // Web player fallback
+    if (!webStream?.url) {
+      alert('لا يوجد رابط بث لهذه القناة.');
+      return;
+    }
+
+    const drm = buildDrmString(webStream.drm);
+
     const headers: Record<string, string> = {};
-    if (stream.userAgent) headers['User-Agent'] = stream.userAgent;
-    if (stream.referrer) headers['Referer'] = stream.referrer;
-    if (stream.cookies) headers['Cookie'] = stream.cookies;
+    if (webStream.userAgent) headers['User-Agent'] = webStream.userAgent;
+    if (webStream.referrer) headers['Referer'] = webStream.referrer;
+    if (webStream.cookies) headers['Cookie'] = webStream.cookies;
     const headersStr = Object.keys(headers).length ? JSON.stringify(headers) : undefined;
 
     if (window.openProPlayer) {
-      window.openProPlayer(stream.url, title, drm, headersStr, preferredPlayer);
+      window.openProPlayer(webStream.url, title, drm, headersStr, preferredPlayer);
     }
   }, [buildDrmString]);
 
-  // Handle channel click
+  // Handle channel click - uses Android config when available
   const handleChannelClick = useCallback((item: Channel | SubChannel) => {
-    // Side menu items always play directly
+    // Helper to build DRM config for Android
+    const buildAndroidDrmConfig = (androidStream?: AndroidStreamConfig) => {
+      if (!androidStream) return {};
+      
+      // Get the ClearKey data based on mode
+      let drmKeyId = androidStream.drmKeyId;
+      let drmKey = androidStream.drmKey;
+      
+      // If combined mode is used, parse it
+      if (androidStream.drmClearKeyMode === 'combined' && androidStream.drmClearKeyCombined) {
+        const parts = androidStream.drmClearKeyCombined.split(':');
+        if (parts.length === 2) {
+          drmKeyId = parts[0];
+          drmKey = parts[1];
+        }
+      }
+      
+      return {
+        drmLicenseUrl: androidStream.drmLicenseUrl,
+        drmScheme: androidStream.drmScheme,
+        drmKeyId,
+        drmKey,
+      };
+    };
+    
+    // Side menu items (sub-channels) - use Android-specific config if available
     if (activeSideMenuId || !('actionType' in item)) {
       const sc = item as SubChannel;
-      openFromStreamConfig(sc.stream, sc.name, sc.preferredPlayer);
+      const androidStream = sc.androidStream;
+      const drmConfig = buildAndroidDrmConfig(androidStream);
+      
+      openFromStreamConfig(
+        sc.stream, 
+        sc.name, 
+        sc.preferredPlayer,
+        androidStream ? {
+          url: androidStream.url,
+          actionType: sc.androidActionType,
+          headers: androidStream.headers,
+          intentUri: androidStream.intentUri,
+          servers: androidStream.servers,
+          ...drmConfig,
+        } : undefined
+      );
       return;
     }
 
@@ -250,8 +325,23 @@ const Index = () => {
       return;
     }
 
-    // Default: direct play
-    openFromStreamConfig(ch.stream, ch.name, ch.preferredPlayer);
+    // Default: direct play - use Android-specific config if available
+    const androidStream = ch.androidStream;
+    const drmConfig = buildAndroidDrmConfig(androidStream);
+    
+    openFromStreamConfig(
+      ch.stream, 
+      ch.name, 
+      ch.preferredPlayer,
+      androidStream ? {
+        url: androidStream.url,
+        actionType: ch.androidActionType,
+        headers: androidStream.headers,
+        intentUri: androidStream.intentUri,
+        servers: androidStream.servers,
+        ...drmConfig,
+      } : undefined
+    );
   }, [activeSideMenuId, fbSideMenus, openFromStreamConfig]);
 
   // Get visible channels for current section

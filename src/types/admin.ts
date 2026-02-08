@@ -49,6 +49,10 @@ export interface AndroidStreamConfig {
   intentUri?: string; // For launching external apps
   drmLicenseUrl?: string;
   drmScheme?: DrmScheme;
+  drmKeyId?: string; // ClearKey Key ID
+  drmKey?: string; // ClearKey Key
+  drmClearKeyCombined?: string; // Combined format: KeyID:Key
+  drmClearKeyMode?: ClearKeyMode; // Which input mode is used
   servers?: Array<{ name: string; url: string }>; // Multi-server support
 }
 

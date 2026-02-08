@@ -1,6 +1,6 @@
 /**
  * Android Bridge - Communication layer between Web App and Android Native Shell
- * Supports the split Web/Android architecture
+ * Supports the split Web/Android architecture with full DRM support
  */
 
 interface AndroidInterface {
@@ -101,6 +101,7 @@ export function showAndroidToast(message: string): boolean {
 
 /**
  * Build Android stream config from channel data
+ * Supports full DRM configuration including ClearKey with keyId:key format
  */
 export function buildAndroidStreamConfig(
   title: string,
@@ -116,6 +117,8 @@ export function buildAndroidStreamConfig(
     intentUri?: string;
     drmLicenseUrl?: string;
     drmScheme?: 'widevine' | 'clearkey' | 'playready';
+    drmKeyId?: string;
+    drmKey?: string;
     servers?: Array<{ name: string; url: string }>;
   }
 ): AndroidStreamData {
@@ -142,15 +145,33 @@ export function buildAndroidStreamConfig(
     }
   }
 
-  // Add DRM if provided
-  if (androidConfig.drmLicenseUrl || androidConfig.drmScheme) {
+  // Add DRM configuration if provided
+  if (androidConfig.drmLicenseUrl || androidConfig.drmScheme || androidConfig.drmKeyId) {
     config.drm = {
-      licenseUrl: androidConfig.drmLicenseUrl,
       scheme: androidConfig.drmScheme || 'clearkey',
     };
+    
+    if (androidConfig.drmLicenseUrl) {
+      config.drm.licenseUrl = androidConfig.drmLicenseUrl;
+    }
+    
+    // Support ClearKey with keyId and key (or combined keyId:key format)
+    if (androidConfig.drmKeyId) {
+      // Check if it's a combined format (keyId:key)
+      if (androidConfig.drmKeyId.includes(':') && !androidConfig.drmKey) {
+        const [keyId, key] = androidConfig.drmKeyId.split(':');
+        config.drm.keyId = keyId;
+        config.drm.key = key;
+      } else {
+        config.drm.keyId = androidConfig.drmKeyId;
+        if (androidConfig.drmKey) {
+          config.drm.key = androidConfig.drmKey;
+        }
+      }
+    }
   }
 
-  // Add intent URI if provided
+  // Add intent URI if provided (for external player apps)
   if (androidConfig.intentUri) {
     config.intentUri = androidConfig.intentUri;
   }
@@ -186,6 +207,8 @@ export function playChannel(
     intentUri?: string;
     drmLicenseUrl?: string;
     drmScheme?: 'widevine' | 'clearkey' | 'playready';
+    drmKeyId?: string;
+    drmKey?: string;
     servers?: Array<{ name: string; url: string }>;
   }
 ): boolean {
