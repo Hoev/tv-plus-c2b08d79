@@ -5,45 +5,11 @@
     android:layout_height="match_parent"
     android:background="@android:color/transparent">
 
-    <!-- Top Bar with Back Button and Title -->
-    <LinearLayout
-        android:id="@+id/top_bar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:background="@drawable/gradient_top"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="24dp"
-        android:paddingVertical="16dp">
-
-        <ImageButton
-            android:id="@+id/exo_back"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/btn_secondary_focus_selector"
-            android:contentDescription="Back"
-            android:src="@drawable/ic_back"
-            android:tint="@android:color/white"
-            android:padding="12dp"
-            android:focusable="true"
-            android:nextFocusRight="@id/exo_rew"
-            android:nextFocusDown="@id/exo_rew" />
-
-        <TextView
-            android:id="@+id/exo_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="16dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text=""
-            android:textColor="@android:color/white"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-    </LinearLayout>
+    <!-- Hidden TimeBar for ExoPlayer binding (required) -->
+    <androidx.media3.ui.DefaultTimeBar
+        android:visibility="gone"
+        android:layout_width="0dp"
+        android:layout_height="0dp" />
 
     <!-- Center Controls (Rewind, Play/Pause, Forward) -->
     <LinearLayout
@@ -53,131 +19,124 @@
         android:gravity="center"
         android:orientation="horizontal">
 
-        <!-- Rewind 10s -->
+        <!-- Rewind (simple circular arrow) -->
         <ImageButton
             android:id="@id/exo_rew"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginEnd="48dp"
-            android:background="@drawable/btn_secondary_focus_selector"
-            android:contentDescription="Rewind 10 seconds"
-            android:src="@drawable/ic_rewind_10"
-            android:tint="@android:color/white"
-            android:padding="16dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginEnd="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Rewind"
+            android:src="@drawable/ic_rewind_simple"
+            android:padding="12dp"
             android:focusable="true"
-            android:nextFocusLeft="@id/exo_back"
             android:nextFocusRight="@id/exo_play_pause" />
-
-        <!-- Hidden TimeBar for ExoPlayer binding -->
-        <androidx.media3.ui.DefaultTimeBar
-            android:visibility="gone"
-            android:layout_width="0dp"
-            android:layout_height="0dp" />
 
         <!-- Large Gold Circular Play/Pause Button -->
         <ImageButton
             android:id="@id/exo_play_pause"
-            android:layout_width="104dp"
-            android:layout_height="104dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
             android:background="@drawable/btn_focus_selector"
             android:contentDescription="Play/Pause"
             android:src="@drawable/ic_play"
             android:tint="@android:color/black"
-            android:padding="24dp"
+            android:padding="20dp"
             android:focusable="true"
             android:nextFocusLeft="@id/exo_rew"
             android:nextFocusRight="@id/exo_ffwd"
             android:nextFocusDown="@id/exo_progress" />
 
-        <!-- Forward 10s -->
+        <!-- Forward (simple circular arrow) -->
         <ImageButton
             android:id="@id/exo_ffwd"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginStart="48dp"
-            android:background="@drawable/btn_secondary_focus_selector"
-            android:contentDescription="Forward 10 seconds"
-            android:src="@drawable/ic_forward_10"
-            android:tint="@android:color/white"
-            android:padding="16dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginStart="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Forward"
+            android:src="@drawable/ic_forward_simple"
+            android:padding="12dp"
             android:focusable="true"
             android:nextFocusLeft="@id/exo_play_pause"
             android:nextFocusRight="@id/exo_settings" />
 
     </LinearLayout>
 
-    <!-- Bottom Bar with Progress and Controls -->
+    <!-- Bottom Bar -->
     <LinearLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@drawable/gradient_bottom"
-        android:gravity="center_vertical"
         android:orientation="vertical"
         android:paddingHorizontal="24dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="24dp">
+        android:paddingBottom="16dp">
 
-        <!-- Row 1: Time Display + Seekbar -->
+        <!-- Seekbar (full width, thin) -->
+        <androidx.media3.ui.DefaultTimeBar
+            android:id="@id/exo_progress"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            app:played_color="@color/gold_accent"
+            app:unplayed_color="#44FFFFFF"
+            app:buffered_color="#66FFD700"
+            app:scrubber_color="@color/gold_accent"
+            app:scrubber_enabled_size="12dp"
+            app:scrubber_disabled_size="8dp"
+            app:scrubber_dragged_size="16dp"
+            app:bar_height="3dp"
+            app:touch_target_height="26dp"
+            android:focusable="true"
+            android:nextFocusUp="@id/exo_play_pause"
+            android:nextFocusDown="@id/exo_settings" />
+
+        <!-- Bottom Row: Time on left, icons on right -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
 
-            <!-- Current Position -->
-            <TextView
-                android:id="@id/exo_position"
+            <!-- Time Display: 00:00 · 00:00 -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"
-                android:minWidth="48dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <!-- Gold Seekbar -->
-            <androidx.media3.ui.DefaultTimeBar
-                android:id="@id/exo_progress"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="12dp"
-                app:played_color="@color/gold_accent"
-                app:unplayed_color="#33FFFFFF"
-                app:buffered_color="#66FFD700"
-                app:scrubber_color="@color/gold_accent"
-                app:scrubber_enabled_size="16dp"
-                app:scrubber_disabled_size="10dp"
-                app:scrubber_dragged_size="20dp"
-                app:bar_height="4dp"
-                app:touch_target_height="36dp"
-                android:focusable="true"
-                android:nextFocusUp="@id/exo_play_pause"
-                android:nextFocusDown="@id/exo_settings" />
+                <!-- Current Position -->
+                <TextView
+                    android:id="@id/exo_position"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#AAFFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:includeFontPadding="false" />
 
-            <!-- Total Duration -->
-            <TextView
-                android:id="@id/exo_duration"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#AAFFFFFF"
-                android:textSize="14sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"
-                android:minWidth="48dp"
-                android:gravity="end" />
+                <!-- Separator -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" · "
+                    android:textColor="#66FFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:includeFontPadding="false" />
 
-        </LinearLayout>
+                <!-- Total Duration -->
+                <TextView
+                    android:id="@id/exo_duration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#66FFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:includeFontPadding="false" />
 
-        <!-- Row 2: Control Buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end|center_vertical"
-            android:layout_marginTop="12dp">
+            </LinearLayout>
 
             <!-- Spacer -->
             <View
@@ -185,67 +144,102 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
-            <!-- Server Selection Button (Multi-Server) -->
-            <ImageButton
-                android:id="@+id/exo_server"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="16dp"
-                android:background="@drawable/btn_secondary_focus_selector"
-                android:contentDescription="Select Server"
-                android:src="@drawable/ic_server"
-                android:tint="@android:color/white"
-                android:padding="10dp"
-                android:focusable="true"
-                android:visibility="gone"
-                android:nextFocusRight="@id/exo_settings"
-                android:nextFocusUp="@id/exo_progress" />
+            <!-- Control Icons Row -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <!-- Settings Button (Track Selection) -->
-            <ImageButton
-                android:id="@+id/exo_settings"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="16dp"
-                android:background="@drawable/btn_secondary_focus_selector"
-                android:contentDescription="Settings"
-                android:src="@drawable/ic_settings"
-                android:tint="@android:color/white"
-                android:padding="10dp"
-                android:focusable="true"
-                android:nextFocusLeft="@id/exo_server"
-                android:nextFocusRight="@id/exo_resize"
-                android:nextFocusUp="@id/exo_progress" />
+                <!-- Subtitles/CC Button -->
+                <ImageButton
+                    android:id="@+id/exo_subtitle"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/btn_icon_focus_selector"
+                    android:contentDescription="Subtitles"
+                    android:src="@drawable/ic_subtitles"
+                    android:padding="10dp"
+                    android:focusable="true"
+                    android:nextFocusRight="@id/exo_settings"
+                    android:nextFocusUp="@id/exo_progress" />
 
-            <!-- Resize/Aspect Ratio Button -->
-            <ImageButton
-                android:id="@+id/exo_resize"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="16dp"
-                android:background="@drawable/btn_secondary_focus_selector"
-                android:contentDescription="Resize"
-                android:src="@drawable/ic_resize"
-                android:tint="@android:color/white"
-                android:padding="10dp"
-                android:focusable="true"
-                android:nextFocusLeft="@id/exo_settings"
-                android:nextFocusRight="@id/exo_pip"
-                android:nextFocusUp="@id/exo_progress" />
+                <!-- Settings Button (Track Selection) -->
+                <ImageButton
+                    android:id="@+id/exo_settings"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/btn_icon_focus_selector"
+                    android:contentDescription="Settings"
+                    android:src="@drawable/ic_settings"
+                    android:padding="10dp"
+                    android:focusable="true"
+                    android:nextFocusLeft="@id/exo_subtitle"
+                    android:nextFocusRight="@id/exo_cast"
+                    android:nextFocusUp="@id/exo_progress" />
 
-            <!-- PiP Button -->
-            <ImageButton
-                android:id="@+id/exo_pip"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/btn_secondary_focus_selector"
-                android:contentDescription="Picture in Picture"
-                android:src="@drawable/ic_pip"
-                android:tint="@android:color/white"
-                android:padding="10dp"
-                android:focusable="true"
-                android:nextFocusLeft="@id/exo_resize"
-                android:nextFocusUp="@id/exo_progress" />
+                <!-- Chromecast Button -->
+                <ImageButton
+                    android:id="@+id/exo_cast"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/btn_icon_focus_selector"
+                    android:contentDescription="Cast"
+                    android:src="@drawable/ic_cast"
+                    android:padding="10dp"
+                    android:focusable="true"
+                    android:nextFocusLeft="@id/exo_settings"
+                    android:nextFocusRight="@id/exo_server"
+                    android:nextFocusUp="@id/exo_progress" />
+
+                <!-- Server Selection Button (Multi-Server) -->
+                <ImageButton
+                    android:id="@+id/exo_server"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/btn_icon_focus_selector"
+                    android:contentDescription="Select Server"
+                    android:src="@drawable/ic_server"
+                    android:padding="10dp"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    android:nextFocusLeft="@id/exo_cast"
+                    android:nextFocusRight="@id/exo_resize"
+                    android:nextFocusUp="@id/exo_progress" />
+
+                <!-- Resize/Aspect Ratio Button -->
+                <ImageButton
+                    android:id="@+id/exo_resize"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/btn_icon_focus_selector"
+                    android:contentDescription="Resize"
+                    android:src="@drawable/ic_fullscreen"
+                    android:padding="10dp"
+                    android:focusable="true"
+                    android:nextFocusLeft="@id/exo_server"
+                    android:nextFocusRight="@id/exo_pip"
+                    android:nextFocusUp="@id/exo_progress" />
+
+                <!-- PiP Button -->
+                <ImageButton
+                    android:id="@+id/exo_pip"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/btn_icon_focus_selector"
+                    android:contentDescription="Picture in Picture"
+                    android:src="@drawable/ic_pip"
+                    android:padding="10dp"
+                    android:focusable="true"
+                    android:nextFocusLeft="@id/exo_resize"
+                    android:nextFocusUp="@id/exo_progress" />
+
+            </LinearLayout>
 
         </LinearLayout>
 

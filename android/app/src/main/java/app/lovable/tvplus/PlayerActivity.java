@@ -13,15 +13,13 @@ import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
 import android.util.Rational;
-import android.view.Gravity;
+import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -31,12 +29,15 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.MenuItemCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.TrackGroup;
@@ -46,10 +47,6 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
-import androidx.media3.exoplayer.drm.DefaultDrmSessionManager;
-import androidx.media3.exoplayer.drm.DrmSessionManager;
-import androidx.media3.exoplayer.drm.HttpMediaDrmCallback;
-import androidx.media3.exoplayer.drm.FrameworkMediaDrm;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
 import androidx.media3.exoplayer.dash.DashMediaSource;
 import androidx.media3.exoplayer.source.MediaSource;
@@ -57,16 +54,27 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
+import androidx.mediarouter.app.MediaRouteActionProvider;
+import androidx.mediarouter.app.MediaRouteButton;
+import androidx.mediarouter.media.MediaControlIntent;
+import androidx.mediarouter.media.MediaRouteSelector;
+import androidx.mediarouter.media.MediaRouter;
 
+import com.google.android.gms.cast.MediaInfo;
+import com.google.android.gms.cast.MediaLoadRequestData;
+import com.google.android.gms.cast.framework.CastButtonFactory;
+import com.google.android.gms.cast.framework.CastContext;
+import com.google.android.gms.cast.framework.CastSession;
+import com.google.android.gms.cast.framework.SessionManager;
+import com.google.android.gms.cast.framework.SessionManagerListener;
+import com.google.android.gms.cast.framework.media.RemoteMediaClient;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Native ExoPlayer Activity with Gold & Black theme
@@ -76,6 +84,7 @@ import java.util.UUID;
  * - Full Widevine/ClearKey DRM support
  * - Multi-Server selection
  * - Track selection dialog (sorted by resolution)
+ * - Chromecast support
  * - Aspect ratio cycling
  * - Picture-in-Picture (Android O+)
  * - TV Remote navigation
@@ -91,6 +100,12 @@ public class PlayerActivity extends AppCompatActivity {
     private StreamConfig streamConfig;
     private Gson gson = new Gson();
     private int currentServerIndex = 0;
+    
+    // Chromecast
+    private CastContext castContext;
+    private CastSession castSession;
+    private SessionManager sessionManager;
+    private SessionManagerListener<CastSession> sessionManagerListener;
     
     // Track selection state
     private int selectedVideoTrackIndex = -1; // -1 = Auto
@@ -117,6 +132,9 @@ public class PlayerActivity extends AppCompatActivity {
         
         playerView = findViewById(R.id.playerView);
         
+        // Initialize Chromecast
+        initializeCast();
+        
         // Parse stream config from intent
         String configJson = getIntent().getStringExtra("streamConfig");
         if (configJson == null || configJson.isEmpty()) {
@@ -141,6 +159,94 @@ public class PlayerActivity extends AppCompatActivity {
         setupUI();
         initializePlayer();
     }
+    
+    private void initializeCast() {
+        try {
+            castContext = CastContext.getSharedInstance(this);
+            sessionManager = castContext.getSessionManager();
+            
+            sessionManagerListener = new SessionManagerListener<CastSession>() {
+                @Override
+                public void onSessionStarting(@NonNull CastSession session) {}
+                
+                @Override
+                public void onSessionStarted(@NonNull CastSession session, @NonNull String sessionId) {
+                    castSession = session;
+                    Log.d(TAG, "Cast session started");
+                    castCurrentMedia();
+                }
+                
+                @Override
+                public void onSessionStartFailed(@NonNull CastSession session, int error) {
+                    Log.e(TAG, "Cast session start failed: " + error);
+                }
+                
+                @Override
+                public void onSessionEnding(@NonNull CastSession session) {}
+                
+                @Override
+                public void onSessionEnded(@NonNull CastSession session, int error) {
+                    castSession = null;
+                    Log.d(TAG, "Cast session ended");
+                    if (player != null) {
+                        player.setPlayWhenReady(true);
+                    }
+                }
+                
+                @Override
+                public void onSessionResuming(@NonNull CastSession session, @NonNull String sessionId) {}
+                
+                @Override
+                public void onSessionResumed(@NonNull CastSession session, boolean wasSuspended) {
+                    castSession = session;
+                }
+                
+                @Override
+                public void onSessionSuspended(@NonNull CastSession session, int reason) {}
+            };
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize Cast", e);
+        }
+    }
+    
+    private void castCurrentMedia() {
+        if (castSession == null || streamConfig == null) return;
+        
+        try {
+            RemoteMediaClient remoteMediaClient = castSession.getRemoteMediaClient();
+            if (remoteMediaClient == null) return;
+            
+            // Pause local playback
+            if (player != null) {
+                player.setPlayWhenReady(false);
+            }
+            
+            // Build cast media info
+            String contentType = MimeTypes.APPLICATION_M3U8;
+            String url = streamConfig.url.toLowerCase();
+            if (url.contains(".mpd")) {
+                contentType = MimeTypes.APPLICATION_MPD;
+            } else if (url.contains(".mp4")) {
+                contentType = MimeTypes.VIDEO_MP4;
+            }
+            
+            MediaInfo mediaInfo = new MediaInfo.Builder(streamConfig.url)
+                .setStreamType(MediaInfo.STREAM_TYPE_LIVE)
+                .setContentType(contentType)
+                .build();
+            
+            MediaLoadRequestData loadRequest = new MediaLoadRequestData.Builder()
+                .setMediaInfo(mediaInfo)
+                .setAutoplay(true)
+                .build();
+            
+            remoteMediaClient.load(loadRequest);
+            Toast.makeText(this, "Casting to " + castSession.getCastDevice().getFriendlyName(), Toast.LENGTH_SHORT).show();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to cast media", e);
+        }
+    }
 
     private void enableFullscreen() {
         getWindow().setFlags(
@@ -156,18 +262,6 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void setupUI() {
-        // Set title
-        TextView titleView = playerView.findViewById(R.id.exo_title);
-        if (titleView != null && streamConfig.title != null) {
-            titleView.setText(streamConfig.title);
-        }
-        
-        // Back button
-        ImageButton backButton = playerView.findViewById(R.id.exo_back);
-        if (backButton != null) {
-            backButton.setOnClickListener(v -> finish());
-        }
-        
         // Resize button
         ImageButton resizeButton = playerView.findViewById(R.id.exo_resize);
         if (resizeButton != null) {
@@ -186,6 +280,18 @@ public class PlayerActivity extends AppCompatActivity {
             settingsButton.setOnClickListener(v -> showTrackSelectionDialog());
         }
         
+        // Subtitle button - Show subtitle selection
+        ImageButton subtitleButton = playerView.findViewById(R.id.exo_subtitle);
+        if (subtitleButton != null) {
+            subtitleButton.setOnClickListener(v -> showSubtitleSelectionDialog());
+        }
+        
+        // Cast button - Chromecast
+        ImageButton castButton = playerView.findViewById(R.id.exo_cast);
+        if (castButton != null) {
+            castButton.setOnClickListener(v -> showCastDialog());
+        }
+        
         // Server button - Multi-server selection (only show if servers available)
         ImageButton serverButton = playerView.findViewById(R.id.exo_server);
         if (serverButton != null) {
@@ -195,6 +301,105 @@ public class PlayerActivity extends AppCompatActivity {
             } else {
                 serverButton.setVisibility(View.GONE);
             }
+        }
+    }
+    
+    private void showSubtitleSelectionDialog() {
+        if (player == null) return;
+        
+        Tracks tracks = player.getCurrentTracks();
+        List<TrackInfo> subtitleTracks = new ArrayList<>();
+        
+        for (Tracks.Group trackGroup : tracks.getGroups()) {
+            TrackGroup group = trackGroup.getMediaTrackGroup();
+            if (trackGroup.getType() == C.TRACK_TYPE_TEXT) {
+                for (int i = 0; i < group.length; i++) {
+                    Format format = group.getFormat(i);
+                    String label = format.label != null ? format.label : 
+                                   (format.language != null ? format.language : "Subtitle " + (i + 1));
+                    subtitleTracks.add(new TrackInfo(label, group, i, 0, 0));
+                }
+            }
+        }
+        
+        if (subtitleTracks.isEmpty()) {
+            Toast.makeText(this, "No subtitles available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        String[] options = new String[subtitleTracks.size() + 1];
+        options[0] = "Off";
+        for (int i = 0; i < subtitleTracks.size(); i++) {
+            options[i + 1] = subtitleTracks.get(i).label;
+        }
+        
+        new AlertDialog.Builder(this, R.style.GoldDialogTheme)
+            .setTitle("Subtitles")
+            .setItems(options, (dialog, which) -> {
+                if (which == 0) {
+                    // Disable subtitles
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                            .build()
+                    );
+                } else {
+                    TrackInfo track = subtitleTracks.get(which - 1);
+                    TrackSelectionOverride override = new TrackSelectionOverride(
+                        track.group, List.of(track.formatIndex));
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            .addOverride(override)
+                            .build()
+                    );
+                }
+            })
+            .show();
+    }
+    
+    private void showCastDialog() {
+        try {
+            if (castContext != null) {
+                // Use MediaRouter to show device selection
+                MediaRouter mediaRouter = MediaRouter.getInstance(this);
+                MediaRouteSelector selector = new MediaRouteSelector.Builder()
+                    .addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
+                    .build();
+                
+                List<MediaRouter.RouteInfo> routes = mediaRouter.getRoutes();
+                List<MediaRouter.RouteInfo> castRoutes = new ArrayList<>();
+                
+                for (MediaRouter.RouteInfo route : routes) {
+                    if (route.matchesSelector(selector) && !route.isDefault()) {
+                        castRoutes.add(route);
+                    }
+                }
+                
+                if (castRoutes.isEmpty()) {
+                    Toast.makeText(this, "No Cast devices found", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                String[] deviceNames = new String[castRoutes.size()];
+                for (int i = 0; i < castRoutes.size(); i++) {
+                    deviceNames[i] = castRoutes.get(i).getName();
+                }
+                
+                new AlertDialog.Builder(this, R.style.GoldDialogTheme)
+                    .setTitle("Cast to")
+                    .setItems(deviceNames, (dialog, which) -> {
+                        MediaRouter.RouteInfo route = castRoutes.get(which);
+                        mediaRouter.selectRoute(route);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            } else {
+                Toast.makeText(this, "Chromecast not available", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Cast dialog error", e);
+            Toast.makeText(this, "Cast error", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -731,7 +936,10 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (player != null) {
+        if (sessionManager != null && sessionManagerListener != null) {
+            sessionManager.addSessionManagerListener(sessionManagerListener, CastSession.class);
+        }
+        if (player != null && castSession == null) {
             player.setPlayWhenReady(true);
         }
     }
@@ -739,6 +947,9 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        if (sessionManager != null && sessionManagerListener != null) {
+            sessionManager.removeSessionManagerListener(sessionManagerListener, CastSession.class);
+        }
         if (player != null && !checkPipMode()) {
             player.setPlayWhenReady(false);
         }
