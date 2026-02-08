@@ -186,13 +186,6 @@ public class PlayerActivity extends AppCompatActivity {
                 serverButton.setVisibility(View.GONE);
             }
         }
-            if (streamConfig.hasServers() && streamConfig.servers.size() > 1) {
-                serverButton.setVisibility(View.VISIBLE);
-                serverButton.setOnClickListener(v -> showServerSelectionDialog());
-            } else {
-                serverButton.setVisibility(View.GONE);
-            }
-        }
     }
     
     private void showSubtitleSelectionDialog() {
