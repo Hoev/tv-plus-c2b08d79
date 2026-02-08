@@ -181,19 +181,19 @@
                     android:nextFocusUp="@id/exo_progress" />
 
                 <!-- Chromecast Button -->
-                <ImageButton
+                <androidx.mediarouter.app.MediaRouteButton
                     android:id="@+id/exo_cast"
                     android:layout_width="44dp"
                     android:layout_height="44dp"
                     android:layout_marginEnd="8dp"
                     android:background="@drawable/btn_icon_focus_selector"
                     android:contentDescription="Cast"
-                    android:src="@drawable/ic_cast"
                     android:padding="10dp"
                     android:focusable="true"
                     android:nextFocusLeft="@id/exo_settings"
                     android:nextFocusRight="@id/exo_server"
-                    android:nextFocusUp="@id/exo_progress" />
+                    android:nextFocusUp="@id/exo_progress"
+                    app:externalRouteEnabledDrawable="@drawable/ic_cast" />
 
                 <!-- Server Selection Button (Multi-Server) -->
                 <ImageButton

@@ -286,10 +286,14 @@ public class PlayerActivity extends AppCompatActivity {
             subtitleButton.setOnClickListener(v -> showSubtitleSelectionDialog());
         }
         
-        // Cast button - Chromecast
-        ImageButton castButton = playerView.findViewById(R.id.exo_cast);
+        // Cast button - Chromecast (standard MediaRouteButton wiring)
+        MediaRouteButton castButton = playerView.findViewById(R.id.exo_cast);
         if (castButton != null) {
-            castButton.setOnClickListener(v -> showCastDialog());
+            try {
+                CastButtonFactory.setUpMediaRouteButton(getApplicationContext(), castButton);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to setup Cast button", e);
+            }
         }
         
         // Server button - Multi-server selection (only show if servers available)
@@ -358,49 +362,12 @@ public class PlayerActivity extends AppCompatActivity {
             .show();
     }
     
+    /**
+     * Cast device selection is handled by the MediaRouteButton (exo_cast).
+     * Keeping this method as a safe no-op to avoid build/runtime issues.
+     */
     private void showCastDialog() {
-        try {
-            if (castContext != null) {
-                // Use MediaRouter to show device selection
-                MediaRouter mediaRouter = MediaRouter.getInstance(this);
-                MediaRouteSelector selector = new MediaRouteSelector.Builder()
-                    .addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
-                    .build();
-                
-                List<MediaRouter.RouteInfo> routes = mediaRouter.getRoutes();
-                List<MediaRouter.RouteInfo> castRoutes = new ArrayList<>();
-                
-                for (MediaRouter.RouteInfo route : routes) {
-                    if (route.matchesSelector(selector) && !route.isDefault()) {
-                        castRoutes.add(route);
-                    }
-                }
-                
-                if (castRoutes.isEmpty()) {
-                    Toast.makeText(this, "No Cast devices found", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                String[] deviceNames = new String[castRoutes.size()];
-                for (int i = 0; i < castRoutes.size(); i++) {
-                    deviceNames[i] = castRoutes.get(i).getName();
-                }
-                
-                new AlertDialog.Builder(this, R.style.GoldDialogTheme)
-                    .setTitle("Cast to")
-                    .setItems(deviceNames, (dialog, which) -> {
-                        MediaRouter.RouteInfo route = castRoutes.get(which);
-                        mediaRouter.selectRoute(route);
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-            } else {
-                Toast.makeText(this, "Chromecast not available", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Cast dialog error", e);
-            Toast.makeText(this, "Cast error", Toast.LENGTH_SHORT).show();
-        }
+        Toast.makeText(this, "Use the Cast button", Toast.LENGTH_SHORT).show();
     }
 
     private void cycleResizeMode() {
