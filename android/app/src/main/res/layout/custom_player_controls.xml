@@ -70,7 +70,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:paddingHorizontal="24dp"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
         android:paddingBottom="16dp">
 
         <!-- Seekbar (full width, thin) -->
