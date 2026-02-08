@@ -27,16 +27,15 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
-    <!-- Gold themed Dialog -->
-    <style name="GoldDialogTheme" parent="Theme.MaterialComponents.Dialog.Alert">
+    <!-- Gold themed Dialog (AppCompat-safe to avoid resource resolution issues) -->
+    <style name="GoldDialogTheme" parent="Theme.AppCompat.Dialog.Alert">
         <item name="android:background">#1A1A1A</item>
         <item name="android:textColor">@android:color/white</item>
-        <item name="colorPrimary">@color/gold_accent</item>
         <item name="colorAccent">@color/gold_accent</item>
         <item name="android:windowTitleStyle">@style/GoldDialogTitle</item>
     </style>
 
-    <style name="GoldDialogTitle" parent="TextAppearance.MaterialComponents.Headline6">
+    <style name="GoldDialogTitle" parent="TextAppearance.AppCompat.Title">
         <item name="android:textColor">@color/gold_accent</item>
     </style>
 
