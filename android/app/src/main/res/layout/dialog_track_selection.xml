@@ -71,17 +71,22 @@
         android:layout_height="1dp"
         android:background="#E0E0E0" />
 
-    <!-- Content Container -->
+    <!-- Scrollable Content Container with max height -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="150dp">
 
         <!-- Video Tracks List -->
         <ScrollView
             android:id="@+id/video_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="visible">
+            android:visibility="visible"
+            android:scrollbars="vertical"
+            android:fadeScrollbars="false"
+            android:fillViewport="true">
 
             <RadioGroup
                 android:id="@+id/video_radio_group"
@@ -96,7 +101,10 @@
             android:id="@+id/audio_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone">
+            android:visibility="gone"
+            android:scrollbars="vertical"
+            android:fadeScrollbars="false"
+            android:fillViewport="true">
 
             <RadioGroup
                 android:id="@+id/audio_radio_group"
@@ -113,13 +121,15 @@
         android:layout_height="1dp"
         android:background="#E0E0E0" />
 
-    <!-- Buttons -->
+    <!-- Fixed Buttons at Bottom -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
+        android:layout_height="56dp"
         android:orientation="horizontal"
-        android:gravity="end"
-        android:padding="8dp">
+        android:gravity="end|center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="#FFFFFF">
 
         <Button
             android:id="@+id/btn_cancel"
@@ -127,9 +137,12 @@
             android:layout_height="wrap_content"
             android:text="CANCEL"
             android:textColor="#888888"
+            android:textSize="14sp"
+            android:textStyle="bold"
             android:background="?attr/selectableItemBackground"
             android:focusable="true"
-            android:minWidth="80dp" />
+            android:minWidth="88dp"
+            android:layout_marginEnd="8dp" />
 
         <Button
             android:id="@+id/btn_ok"
@@ -137,9 +150,11 @@
             android:layout_height="wrap_content"
             android:text="OK"
             android:textColor="#FFD700"
+            android:textSize="14sp"
+            android:textStyle="bold"
             android:background="?attr/selectableItemBackground"
             android:focusable="true"
-            android:minWidth="80dp" />
+            android:minWidth="88dp" />
     </LinearLayout>
 
 </LinearLayout>
