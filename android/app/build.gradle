@@ -47,6 +47,11 @@ dependencies {
     implementation 'androidx.media3:media3-exoplayer-dash:1.2.1'
     implementation 'androidx.media3:media3-datasource-okhttp:1.2.1'
     
+    // Cast SDK for Chromecast
+    implementation 'androidx.media3:media3-cast:1.2.1'
+    implementation 'androidx.mediarouter:mediarouter:1.6.0'
+    implementation 'com.google.android.gms:play-services-cast-framework:21.4.0'
+    
     // OkHttp for custom headers
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     
