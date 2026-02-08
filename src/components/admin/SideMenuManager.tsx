@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update, remove, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
-import { SideMenu, SubChannel, StreamConfig } from '@/types/admin';
-import type { PlayerType } from '@/types/admin';
+import { SideMenu, SubChannel, StreamConfig, AndroidStreamConfig, AndroidActionType } from '@/types/admin';
+import type { WebPlayerType } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,10 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import PlayerConfigForm from './PlayerConfigForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ImageUploader from './ImageUploader';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, MonitorPlay, Play, Globe, Monitor } from 'lucide-react';
+import WebConfigForm from './WebConfigForm';
+import AndroidConfigForm from './AndroidConfigForm';
+import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, Globe, Smartphone } from 'lucide-react';
 
 const SideMenuManager: React.FC = () => {
   const [sideMenus, setSideMenus] = useState<Record<string, SideMenu>>({});
@@ -23,12 +24,26 @@ const SideMenuManager: React.FC = () => {
   const [editingChannel, setEditingChannel] = useState<{ menuId: string; channel: SubChannel | null }>({ menuId: '', channel: null });
   
   const [menuName, setMenuName] = useState('');
-  const [channelForm, setChannelForm] = useState<Partial<SubChannel>>({
+  
+  // Sub-channel form state with split Web/Android config
+  const [channelForm, setChannelForm] = useState<{
+    name: string;
+    imageUrl: string;
+    sortOrder: number;
+    // Web settings
+    stream: StreamConfig;
+    preferredPlayer: WebPlayerType;
+    // Android settings
+    androidStream: Partial<AndroidStreamConfig>;
+    androidActionType: AndroidActionType;
+  }>({
     name: '',
     imageUrl: '',
     sortOrder: 0,
     stream: { url: '' },
-    preferredPlayer: 'default'
+    preferredPlayer: 'default',
+    androidStream: {},
+    androidActionType: 'native'
   });
 
   useEffect(() => {
@@ -104,7 +119,9 @@ const SideMenuManager: React.FC = () => {
       imageUrl: '',
       sortOrder: channelCount,
       stream: { url: '' },
-      preferredPlayer: 'default'
+      preferredPlayer: 'default',
+      androidStream: {},
+      androidActionType: 'native'
     });
     setIsChannelDialogOpen(true);
   };
@@ -116,7 +133,9 @@ const SideMenuManager: React.FC = () => {
       imageUrl: channel.imageUrl,
       sortOrder: channel.sortOrder,
       stream: channel.stream || { url: '' },
-      preferredPlayer: channel.preferredPlayer || 'default'
+      preferredPlayer: channel.preferredPlayer || 'default',
+      androidStream: channel.androidStream || {},
+      androidActionType: channel.androidActionType || 'native'
     });
     setIsChannelDialogOpen(true);
   };
@@ -128,8 +147,12 @@ const SideMenuManager: React.FC = () => {
       name: channelForm.name.trim(),
       imageUrl: channelForm.imageUrl?.trim() || '',
       sortOrder: channelForm.sortOrder || 0,
+      // Web settings
       stream: channelForm.stream,
-      preferredPlayer: channelForm.preferredPlayer || 'default'
+      preferredPlayer: channelForm.preferredPlayer || 'default',
+      // Android settings
+      androidStream: channelForm.androidStream as AndroidStreamConfig,
+      androidActionType: channelForm.androidActionType || 'native'
     };
 
     try {
@@ -144,7 +167,15 @@ const SideMenuManager: React.FC = () => {
       }
 
       setIsChannelDialogOpen(false);
-      setChannelForm({ name: '', imageUrl: '', sortOrder: 0, stream: { url: '' }, preferredPlayer: 'default' });
+      setChannelForm({
+        name: '',
+        imageUrl: '',
+        sortOrder: 0,
+        stream: { url: '' },
+        preferredPlayer: 'default',
+        androidStream: {},
+        androidActionType: 'native'
+      });
     } catch (err) {
       console.error('Firebase save sub-channel error:', err);
       alert('فشل حفظ القناة داخل القائمة الجانبية. تأكد من صلاحيات الكتابة في Firebase (Rules).');
@@ -299,7 +330,23 @@ const SideMenuManager: React.FC = () => {
                               )}
                             </div>
                             
-                            <span className="flex-1 font-medium text-foreground">{channel.name}</span>
+                            <div className="flex-1">
+                              <span className="font-medium text-foreground block">{channel.name}</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                {channel.stream?.url && (
+                                  <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">
+                                    <Globe className="w-3 h-3 inline mr-1" />
+                                    Web
+                                  </span>
+                                )}
+                                {channel.androidStream?.url && (
+                                  <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
+                                    <Smartphone className="w-3 h-3 inline mr-1" />
+                                    Android
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                             
                             <Button
                               variant="ghost"
@@ -357,17 +404,19 @@ const SideMenuManager: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Channel Dialog */}
+      {/* Sub-Channel Dialog with Split Web/Android Config */}
       <Dialog open={isChannelDialogOpen} onOpenChange={setIsChannelDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh]">
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>
               {editingChannel.channel ? 'تعديل قناة فرعية' : 'إضافة قناة فرعية'}
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
+          <ScrollArea className="max-h-[70vh] pr-4">
             <div className="space-y-6 py-4">
-              <div className="space-y-4">
+              {/* Basic Info */}
+              <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+                <h3 className="font-semibold text-foreground">المعلومات الأساسية</h3>
                 <div className="space-y-2">
                   <Label>اسم القناة <span className="text-destructive">*</span></Label>
                   <Input
@@ -384,49 +433,37 @@ const SideMenuManager: React.FC = () => {
                 />
               </div>
 
-              <PlayerConfigForm
-                streamConfig={channelForm.stream || { url: '' }}
-                onChange={(stream) => setChannelForm(prev => ({ ...prev, stream }))}
-              />
-
-              {/* Player Engine Selection */}
-              <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-border">
-                <Label className="flex items-center gap-2">
-                  <MonitorPlay className="w-4 h-4 text-primary" />
-                  محرك التشغيل (للمطورين فقط)
-                </Label>
-                <Select
-                  value={channelForm.preferredPlayer || 'default'}
-                  onValueChange={(value: PlayerType) => setChannelForm(prev => ({ ...prev, preferredPlayer: value }))}
-                >
-                  <SelectTrigger className="bg-secondary border-border">
-                    <SelectValue placeholder="اختر نوع المشغل" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border z-50">
-                    <SelectItem value="default">
-                      <div className="flex items-center gap-2">
-                        <Play className="w-4 h-4 text-green-500" />
-                        <span>المشغل الافتراضي (Native)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="custom">
-                      <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-blue-500" />
-                        <span>المشغل المخصص (Custom Player)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="iframe">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="w-4 h-4 text-purple-500" />
-                        <span>Web/Iframe (تضمين مباشر)</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  اختر نوع المشغل لهذه القناة. المستخدم لن يرى خيار التبديل.
-                </p>
-              </div>
+              {/* Platform-Specific Settings with Tabs */}
+              <Tabs defaultValue="web" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-muted">
+                  <TabsTrigger value="web" className="flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    🌐 إعدادات الويب
+                  </TabsTrigger>
+                  <TabsTrigger value="android" className="flex items-center gap-2">
+                    <Smartphone className="w-4 h-4" />
+                    📱 إعدادات أندرويد
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="web" className="mt-4">
+                  <WebConfigForm
+                    streamConfig={channelForm.stream}
+                    playerType={channelForm.preferredPlayer}
+                    onStreamChange={(stream) => setChannelForm(prev => ({ ...prev, stream }))}
+                    onPlayerTypeChange={(playerType) => setChannelForm(prev => ({ ...prev, preferredPlayer: playerType }))}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="android" className="mt-4">
+                  <AndroidConfigForm
+                    config={channelForm.androidStream}
+                    actionType={channelForm.androidActionType}
+                    onChange={(config) => setChannelForm(prev => ({ ...prev, androidStream: config }))}
+                    onActionTypeChange={(actionType) => setChannelForm(prev => ({ ...prev, androidActionType: actionType }))}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
           </ScrollArea>
           <DialogFooter>

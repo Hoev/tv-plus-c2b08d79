@@ -193,11 +193,13 @@ const Index = () => {
 
     // Check if running in Android app - use native player
     if (isAndroidApp()) {
-      const androidConfig = buildAndroidStreamConfig(stream.url, title, {
-        userAgent: stream.userAgent,
-        referrer: stream.referrer,
-        cookies: stream.cookies,
-        drm: drm,
+      const androidConfig = buildAndroidStreamConfig(title, {
+        url: stream.url,
+        headers: {
+          userAgent: stream.userAgent,
+          referrer: stream.referrer,
+          cookie: stream.cookies,
+        },
       });
       
       if (sendToAndroid(androidConfig)) {
