@@ -551,7 +551,7 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (player != null && !isInPictureInPictureMode()) {
+        if (player != null && !checkPipMode()) {
             player.setPlayWhenReady(false);
         }
     }
@@ -559,7 +559,7 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        if (player != null && !isInPictureInPictureMode()) {
+        if (player != null && !checkPipMode()) {
             player.setPlayWhenReady(false);
         }
     }
@@ -578,9 +578,9 @@ public class PlayerActivity extends AppCompatActivity {
         finish();
     }
     
-    private boolean isInPictureInPictureMode() {
+    private boolean checkPipMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            return isInPictureInPictureMode();
+            return super.isInPictureInPictureMode();
         }
         return false;
     }
