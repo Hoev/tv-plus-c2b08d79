@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import AdminDashboard from "./pages/AdminDashboard";
 import ChannelPlayer from "./pages/ChannelPlayer";
+import SubMenuPage from "./pages/SubMenuPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/channel/:slug" element={<ChannelPlayer />} />
           <Route path="/:slug-player" element={<ChannelPlayer />} />
+          <Route path="/menu/:menuSlug" element={<SubMenuPage />} />
           <Route path="/admin-h" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
