@@ -3,7 +3,7 @@ import PlayerWrapper from '@/components/player/PlayerWrapper';
 import { useIptvData } from '@/hooks/useIptvData';
 import { useTVNavigation } from '@/hooks/useTVNavigation';
 import { useClock } from '@/hooks/useClock';
-import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
+import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection, LovableBadge } from '@/components/tv';
 import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
 import { isAndroidApp, sendToAndroid, buildAndroidStreamConfig } from '@/lib/androidBridge';
 import type { Channel, StreamConfig, SubChannel, AndroidStreamConfig } from '@/types/admin';
@@ -520,6 +520,9 @@ const Index = () => {
         activeId={activeSectionId}
         onSelect={handleSectionChange}
       />
+
+      {/* Lovable Badge - shows once per day */}
+      <LovableBadge />
 
       {/* Player Container */}
       <PlayerWrapper />
