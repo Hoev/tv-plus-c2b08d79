@@ -1,41 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Focused state - Gold glow with animated effect -->
+    <!-- Focused state - Very prominent gold border with glow for TV remote -->
     <item android:state_focused="true">
         <layer-list>
-            <!-- Outer glow ring -->
+            <!-- Outer glow -->
             <item>
-                <shape android:shape="oval">
-                    <solid android:color="#66FFD700" />
-                    <size android:width="104dp" android:height="104dp" />
+                <shape android:shape="rectangle">
+                    <solid android:color="#44FFD700" />
+                    <corners android:radius="28dp" />
                 </shape>
             </item>
-            <!-- Middle glow -->
-            <item android:left="6dp" android:top="6dp" android:right="6dp" android:bottom="6dp">
-                <shape android:shape="oval">
-                    <solid android:color="#99FFD700" />
-                </shape>
-            </item>
-            <!-- Inner gold circle -->
-            <item android:left="10dp" android:top="10dp" android:right="10dp" android:bottom="10dp">
-                <shape android:shape="oval">
-                    <solid android:color="@color/gold_accent" />
+            <!-- Inner area with thick gold border -->
+            <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#22FFD700" />
+                    <corners android:radius="25dp" />
+                    <stroke android:width="3dp" android:color="#FFD700" />
                 </shape>
             </item>
         </layer-list>
     </item>
     
-    <!-- Pressed state - Darker gold -->
+    <!-- Pressed state -->
     <item android:state_pressed="true">
-        <shape android:shape="oval">
-            <solid android:color="@color/gold_dark" />
+        <shape android:shape="rectangle">
+            <solid android:color="#55FFD700" />
+            <corners android:radius="25dp" />
+            <stroke android:width="3dp" android:color="#FFD700" />
         </shape>
     </item>
     
-    <!-- Default state - Standard gold -->
+    <!-- Default state - Subtle background -->
     <item>
-        <shape android:shape="oval">
-            <solid android:color="@color/gold_accent" />
+        <shape android:shape="rectangle">
+            <solid android:color="#22FFFFFF" />
+            <corners android:radius="25dp" />
         </shape>
     </item>
 </selector>
