@@ -1,13 +1,24 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PlayerWrapper from '@/components/player/PlayerWrapper';
 import { useIptvData } from '@/hooks/useIptvData';
 import { useTVNavigation } from '@/hooks/useTVNavigation';
 import { useClock } from '@/hooks/useClock';
-import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection, LovableBadge } from '@/components/tv';
+import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
 import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
 import { isAndroidApp, sendToAndroid, buildAndroidStreamConfig } from '@/lib/androidBridge';
 import type { Channel, StreamConfig, SubChannel, AndroidStreamConfig } from '@/types/admin';
 import type { PlayerType } from '@/types/admin';
+
+// Generate slug from name
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]/g, '')
+    .replace(/--+/g, '-')
+    .trim();
+};
 
 const SETTINGS_ID = '__settings';
 
@@ -49,6 +60,7 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const Index = () => {
+  const navigate = useNavigate();
   const { categories: fbCategories, sideMenus: fbSideMenus, loading: fbLoading, error: fbError } = useIptvData();
   const time = useClock();
 
@@ -315,13 +327,15 @@ const Index = () => {
       return;
     }
     
-    // Handle submenu
+    // Handle submenu - navigate to submenu page
     if (ch.actionType === 'open_submenu') {
       if (!ch.sideMenuId || !fbSideMenus[ch.sideMenuId]) {
         alert('القائمة الفرعية غير موجودة.');
         return;
       }
-      setActiveSideMenuId(ch.sideMenuId);
+      const menu = fbSideMenus[ch.sideMenuId];
+      const menuSlug = generateSlug(menu.name);
+      navigate(`/menu/${menuSlug}`);
       return;
     }
 
@@ -349,14 +363,9 @@ const Index = () => {
     if (showSearchResults) return searchResults;
     if (activeSectionId === SETTINGS_ID) return [];
 
-    if (activeSideMenuId) {
-      return Object.values(fbSideMenus[activeSideMenuId]?.channels || {})
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-    }
-
     return Object.values(fbCategories[activeSectionId]?.channels || {})
       .sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [activeSectionId, activeSideMenuId, fbCategories, fbSideMenus, showSearchResults, searchResults]);
+  }, [activeSectionId, fbCategories, showSearchResults, searchResults]);
 
   // Search functionality
   const handleSearch = useCallback(() => {
@@ -475,22 +484,6 @@ const Index = () => {
         {/* Channels Grid */}
         {activeSectionId !== SETTINGS_ID && !fbLoading && !contentLoading && (
           <div className="section active">
-            {activeSideMenuId && (
-              <button
-                onClick={() => setActiveSideMenuId(null)}
-                style={{
-                  marginBottom: '20px',
-                  padding: '10px 20px',
-                  background: 'hsl(0 0% 15%)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'hsl(var(--foreground))',
-                  cursor: 'pointer',
-                }}
-              >
-                ← Back
-              </button>
-            )}
             <div className="channels-grid">
               {channels.map((item, idx) => (
                 <ChannelCard
@@ -520,9 +513,6 @@ const Index = () => {
         activeId={activeSectionId}
         onSelect={handleSectionChange}
       />
-
-      {/* Lovable Badge - shows once per day */}
-      <LovableBadge />
 
       {/* Player Container */}
       <PlayerWrapper />
