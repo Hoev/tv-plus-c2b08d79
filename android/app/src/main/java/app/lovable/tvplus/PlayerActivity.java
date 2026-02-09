@@ -726,19 +726,40 @@ public class PlayerActivity extends AppCompatActivity {
                 // Check if we have combined keyId:key format in keyId field
                 if (keyId != null && keyId.contains(":") && (key == null || key.isEmpty())) {
                     String[] parts = keyId.split(":");
-                    if (parts.length == 2) {
+                    if (parts.length >= 2) {
                         keyId = parts[0];
-                        key = parts[1];
-                        Log.d(TAG, "Parsed combined ClearKey format");
+                        // Handle case where key might contain "https:" etc by rejoining
+                        if (parts[1].startsWith("http")) {
+                            // This is a URL format like "keyid:https://..."
+                            // Use licenseUrl instead
+                            drmBuilder.setLicenseUri(keyId.substring(keyId.indexOf(":") + 1));
+                            Log.d(TAG, "ClearKey using URL from combined format");
+                            keyId = null;
+                            key = null;
+                        } else {
+                            key = parts[1];
+                            Log.d(TAG, "Parsed combined ClearKey format");
+                        }
                     }
                 }
                 
+                // Special handling for complex keys (like the ones with specific formats)
                 if (keyId != null && !keyId.isEmpty() && key != null && !key.isEmpty()) {
+                    // Validate hex format - remove any non-hex characters
+                    keyId = keyId.replaceAll("[^a-fA-F0-9]", "");
+                    key = key.replaceAll("[^a-fA-F0-9]", "");
+                    
+                    if (keyId.length() >= 32 && key.length() >= 32) {
+                        // Truncate to 32 characters (16 bytes) if longer
+                        keyId = keyId.substring(0, 32);
+                        key = key.substring(0, 32);
+                    }
+                    
                     String clearKeyJson = buildClearKeyJson(keyId, key);
                     String dataUri = "data:application/json;base64," + 
                         Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
                     drmBuilder.setLicenseUri(dataUri);
-                    Log.d(TAG, "ClearKey configured with keyId:key");
+                    Log.d(TAG, "ClearKey configured with keyId:key - keyId length: " + keyId.length() + ", key length: " + key.length());
                 } else if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                     Log.d(TAG, "ClearKey configured with license URL");
@@ -750,15 +771,16 @@ public class PlayerActivity extends AppCompatActivity {
         
         MediaItem mediaItem = mediaItemBuilder.build();
         
-        // Detect format
+        // Detect format - improved detection for complex URLs
         String lowerUrl = url.toLowerCase();
+        String pathOnly = url.contains("?") ? url.substring(0, url.indexOf("?")).toLowerCase() : lowerUrl;
         
-        if (lowerUrl.contains(".m3u8") || lowerUrl.contains("/hls/") || lowerUrl.contains("format=m3u8")) {
+        if (pathOnly.endsWith(".m3u8") || lowerUrl.contains("/hls/") || lowerUrl.contains("format=m3u8")) {
             Log.d(TAG, "Building HLS source");
             return new HlsMediaSource.Factory(dataSourceFactory)
                 .setAllowChunklessPreparation(true)
                 .createMediaSource(mediaItem);
-        } else if (lowerUrl.contains(".mpd") || lowerUrl.contains("/dash/") || lowerUrl.contains("format=mpd")) {
+        } else if (pathOnly.endsWith(".mpd") || lowerUrl.contains("/dash/") || lowerUrl.contains("format=mpd")) {
             Log.d(TAG, "Building DASH source");
             return new DashMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);

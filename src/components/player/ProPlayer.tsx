@@ -234,7 +234,7 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
     }
   };
 
-  // Parse DRM config (supports combined format and URL)
+  // Parse DRM config (supports combined format, URL, and complex keys)
   const parseDrmConfig = async (drmString: string): Promise<{ keyId: string; key: string } | null> => {
     if (!drmString) return null;
 
@@ -246,7 +246,7 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
         // Parse response - expected format: KeyID:Key
         const [keyId, key] = text.trim().split(':');
         if (keyId && key) {
-          return { keyId, key };
+          return { keyId: cleanHexKey(keyId), key: cleanHexKey(key) };
         }
       } catch (e) {
         console.error('Failed to fetch DRM keys from URL:', e);
@@ -255,12 +255,39 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
     }
 
     // It's a combined format KeyID:Key
-    const [keyId, key] = drmString.split(':');
-    if (keyId && key) {
-      return { keyId, key };
+    const colonIndex = drmString.indexOf(':');
+    if (colonIndex > 0) {
+      const keyId = drmString.substring(0, colonIndex);
+      const key = drmString.substring(colonIndex + 1);
+      
+      // Check if key part is a URL (like "keyId:https://...")
+      if (key.startsWith('http')) {
+        try {
+          const response = await fetch(key);
+          const text = await response.text();
+          const [fetchedKeyId, fetchedKey] = text.trim().split(':');
+          if (fetchedKeyId && fetchedKey) {
+            return { keyId: cleanHexKey(fetchedKeyId), key: cleanHexKey(fetchedKey) };
+          }
+        } catch (e) {
+          console.error('Failed to fetch DRM keys from URL in key:', e);
+        }
+        return null;
+      }
+      
+      if (keyId && key) {
+        return { keyId: cleanHexKey(keyId), key: cleanHexKey(key) };
+      }
     }
 
     return null;
+  };
+
+  // Clean hex key - remove non-hex characters and truncate if needed
+  const cleanHexKey = (hex: string): string => {
+    const cleaned = hex.replace(/[^a-fA-F0-9]/g, '');
+    // Standard ClearKey uses 16-byte (32 hex chars) keys
+    return cleaned.length > 32 ? cleaned.substring(0, 32) : cleaned;
   };
 
   // Shaka Player
@@ -402,11 +429,13 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[9999] bg-black flex flex-col touch-manipulation"
+      className="fixed inset-0 z-[9999] bg-black flex items-center justify-center touch-manipulation"
       onClick={handleContainerClick}
       onTouchEnd={handleContainerClick}
       onMouseMove={handleUserActivity}
     >
+      {/* Video Container - Centered */}
+      <div className="relative w-full h-full flex items-center justify-center">
       {/* Buffering Spinner */}
       {isBuffering && (
         <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -663,6 +692,7 @@ const ProPlayer: React.FC<ProPlayerProps> = ({ stream, onClose }) => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
