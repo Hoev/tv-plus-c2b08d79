@@ -43,25 +43,25 @@
         android:orientation="horizontal"
         android:layoutDirection="ltr">
 
-        <!-- Rewind - white/light color for visibility -->
+        <!-- Rewind - white/light color for visibility, with focus selector -->
         <ImageButton
             android:id="@id/exo_rew"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:layout_marginEnd="40dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/btn_center_focus_selector"
             android:contentDescription="Rewind"
             android:src="@drawable/ic_rewind_simple"
             android:padding="12dp"
             android:focusable="true"
             android:nextFocusRight="@id/exo_play_pause" />
 
-        <!-- Play/Pause Button - transparent background (no gold circle) -->
+        <!-- Play/Pause Button - with focus selector for TV remote -->
         <ImageButton
             android:id="@id/exo_play_pause"
             android:layout_width="80dp"
             android:layout_height="80dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/btn_center_focus_selector"
             android:contentDescription="Play/Pause"
             android:src="@drawable/ic_play"
             android:tint="#FFFFFF"
@@ -71,13 +71,13 @@
             android:nextFocusRight="@id/exo_ffwd"
             android:nextFocusDown="@id/exo_progress" />
 
-        <!-- Forward - white/light color for visibility -->
+        <!-- Forward - white/light color for visibility, with focus selector -->
         <ImageButton
             android:id="@id/exo_ffwd"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:layout_marginStart="40dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/btn_center_focus_selector"
             android:contentDescription="Forward"
             android:src="@drawable/ic_forward_simple"
             android:padding="12dp"

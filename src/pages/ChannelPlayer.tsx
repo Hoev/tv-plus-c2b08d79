@@ -11,11 +11,20 @@ import type { Channel, SubChannel, StreamConfig, AndroidStreamConfig, PlayerType
  * Slug is generated from channel name (spaces -> hyphens, lowercase)
  */
 const ChannelPlayer: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const params = useParams<{ slug: string; '*': string }>();
   const navigate = useNavigate();
   const { categories, sideMenus, loading } = useIptvData();
   const [error, setError] = useState<string | null>(null);
   const [playerOpened, setPlayerOpened] = useState(false);
+  
+  // Extract slug from URL - supports /channel/:slug and /:slug-player formats
+  const slug = React.useMemo(() => {
+    if (params.slug) {
+      // Remove "-player" suffix if present (for /:slug-player route)
+      return params.slug.replace(/-player$/, '');
+    }
+    return '';
+  }, [params.slug]);
 
   // Build DRM string from config
   const buildDrmString = (drm: StreamConfig['drm']): string | undefined => {
