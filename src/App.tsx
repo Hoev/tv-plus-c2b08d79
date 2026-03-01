@@ -18,8 +18,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/channel/:slug" element={<ChannelPlayer />} />
-          <Route path="/:slug-player" element={<ChannelPlayer />} />
+          <Route path="/:slug" element={<ChannelPlayer />} />
           <Route path="/admin-h" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

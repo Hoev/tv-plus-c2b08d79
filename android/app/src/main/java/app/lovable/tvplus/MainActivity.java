@@ -37,6 +37,9 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        // Start security monitor
+        SecurityMonitor.getInstance(this).startMonitor();
+
         webView = binding.webView;
         setupWebView();
         
