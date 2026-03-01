@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PlayerWrapper from '@/components/player/PlayerWrapper';
 import { useIptvData } from '@/hooks/useIptvData';
 import { useTVNavigation } from '@/hooks/useTVNavigation';
 import { useClock } from '@/hooks/useClock';
-import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection, LovableBadge } from '@/components/tv';
-import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener, handleNotificationClick } from '@/lib/fcm';
+import { ChannelCard, Sidebar, BottomNav, SearchOverlay, Loader, SettingsSection } from '@/components/tv';
+import { autoPromptNotifications, setupForegroundNotifications, setupDeepLinkListener } from '@/lib/fcm';
 import { isAndroidApp, sendToAndroid, buildAndroidStreamConfig } from '@/lib/androidBridge';
 import type { Channel, StreamConfig, SubChannel, AndroidStreamConfig } from '@/types/admin';
 import type { PlayerType } from '@/types/admin';
@@ -48,16 +49,27 @@ const iconMap: Record<string, React.ReactNode> = {
   settings: settingsIcon,
 };
 
+// Helper to generate slug from name
+const nameToSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]/g, '')
+    .replace(/--+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
 const Index = () => {
   const { categories: fbCategories, sideMenus: fbSideMenus, loading: fbLoading, error: fbError } = useIptvData();
   const time = useClock();
+  const navigate = useNavigate();
 
   const sortedCategories = useMemo(
     () => Object.values(fbCategories).sort((a, b) => a.sortOrder - b.sortOrder),
     [fbCategories]
   );
 
-  const [activeSectionId, setActiveSectionId] = useState<string>(SETTINGS_ID);
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
   const initialCategorySet = useRef(false);
   const [activeSideMenuId, setActiveSideMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,25 +85,25 @@ const Index = () => {
     onCloseSearch: () => {
       setShowSearch(false);
       setSearchQuery('');
-      // Return to first category
       if (sortedCategories.length > 0) {
         setActiveSectionId(sortedCategories[0].id);
       }
     },
   });
 
-  // Initial load - set first category and hide startup loader
+  // Initial load - wait for data to be ready, then show content
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setStartupLoading(false);
-      // Focus search icon after startup
+    if (!fbLoading && sortedCategories.length > 0 && startupLoading) {
+      // Data is loaded, hide startup loader
       setTimeout(() => {
-        const searchIconEl = document.getElementById('mainSearchIcon');
-        if (searchIconEl) searchIconEl.focus();
-      }, 500);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+        setStartupLoading(false);
+        setTimeout(() => {
+          const searchIconEl = document.getElementById('mainSearchIcon');
+          if (searchIconEl) searchIconEl.focus();
+        }, 500);
+      }, 300);
+    }
+  }, [fbLoading, sortedCategories, startupLoading]);
 
   // Auto-prompt for notifications on first visit
   useEffect(() => {
@@ -99,21 +111,15 @@ const Index = () => {
     setupForegroundNotifications();
     setupDeepLinkListener();
     
-    // Handle deep link from URL params
     const params = new URLSearchParams(window.location.search);
     const channelId = params.get('channel');
     const menuId = params.get('menu');
-    const subchannelId = params.get('subchannel');
     
     if (channelId || menuId) {
-      // Remove params from URL
       window.history.replaceState({}, '', '/');
-      
-      // Handle navigation after data loads
       if (menuId) {
         setActiveSideMenuId(menuId);
       }
-      // Channel/subchannel handling would be done after data loads
     }
   }, []);
 
@@ -125,19 +131,13 @@ const Index = () => {
     }
   }, [sortedCategories]);
 
-  // Build nav items from Firebase categories
+  // Build nav items from Firebase categories (no settings in nav)
   const navItems = useMemo(() => {
-    const items = sortedCategories.map((cat) => ({
+    return sortedCategories.map((cat) => ({
       id: cat.id,
       name: cat.name.toUpperCase(),
       icon: iconMap[cat.name.toLowerCase()] || sportIcon,
     }));
-    items.push({
-      id: SETTINGS_ID,
-      name: 'SETTINGS',
-      icon: settingsIcon,
-    });
-    return items;
   }, [sortedCategories]);
 
   // Handle section change with loader
@@ -157,32 +157,20 @@ const Index = () => {
     if (showSearchResults) return `SEARCH RESULTS (${searchResults.length})`;
     if (activeSideMenuId) return fbSideMenus[activeSideMenuId]?.name?.toUpperCase() || 'SUBMENU';
     if (activeSectionId === SETTINGS_ID) return 'SETTINGS';
-    return fbCategories[activeSectionId]?.name?.toUpperCase() || 'TV PLUS';
+    return fbCategories[activeSectionId]?.name?.toUpperCase() || 'APiX';
   };
 
   // Build DRM string from config (supports all modes)
   const buildDrmString = useCallback((drm: StreamConfig['drm']): string | undefined => {
     if (!drm) return undefined;
-    
     const mode = drm.clearKeyMode || 'separate';
-    
-    if (mode === 'combined' && drm.clearKeyCombined) {
-      return drm.clearKeyCombined;
-    }
-    
-    if (mode === 'url' && drm.clearKeyUrl) {
-      return drm.clearKeyUrl;
-    }
-    
-    // Default: separate mode
-    if (drm.clearKeyId && drm.clearKeyKey) {
-      return `${drm.clearKeyId}:${drm.clearKeyKey}`;
-    }
-    
+    if (mode === 'combined' && drm.clearKeyCombined) return drm.clearKeyCombined;
+    if (mode === 'url' && drm.clearKeyUrl) return drm.clearKeyUrl;
+    if (drm.clearKeyId && drm.clearKeyKey) return `${drm.clearKeyId}:${drm.clearKeyKey}`;
     return undefined;
   }, []);
 
-  // Open player - uses Android-specific config when running in Android app
+  // Open player
   const openFromStreamConfig = useCallback((
     webStream: StreamConfig | undefined, 
     title: string, 
@@ -190,12 +178,7 @@ const Index = () => {
     androidConfig?: {
       url?: string;
       actionType?: 'native' | 'webview' | 'intent';
-      headers?: {
-        userAgent?: string;
-        referrer?: string;
-        cookie?: string;
-        origin?: string;
-      };
+      headers?: { userAgent?: string; referrer?: string; cookie?: string; origin?: string; };
       intentUri?: string;
       drmLicenseUrl?: string;
       drmScheme?: 'widevine' | 'clearkey' | 'playready';
@@ -204,16 +187,12 @@ const Index = () => {
       servers?: Array<{ name: string; url: string }>;
     }
   ) => {
-    // Check if running in Android app - use Android-specific config
     if (isAndroidApp()) {
-      // Use Android config if available, otherwise fall back to web stream
       const streamUrl = androidConfig?.url || webStream?.url;
-      
       if (!streamUrl) {
         alert('لا يوجد رابط بث لهذه القناة.');
         return;
       }
-      
       const streamData = buildAndroidStreamConfig(title, {
         url: streamUrl,
         actionType: androidConfig?.actionType || 'native',
@@ -229,20 +208,15 @@ const Index = () => {
         drmKey: androidConfig?.drmKey,
         servers: androidConfig?.servers,
       });
-      
-      if (sendToAndroid(streamData)) {
-        return; // Successfully sent to Android native player
-      }
+      if (sendToAndroid(streamData)) return;
     }
 
-    // Web player fallback
     if (!webStream?.url) {
       alert('لا يوجد رابط بث لهذه القناة.');
       return;
     }
 
     const drm = buildDrmString(webStream.drm);
-
     const headers: Record<string, string> = {};
     if (webStream.userAgent) headers['User-Agent'] = webStream.userAgent;
     if (webStream.referrer) headers['Referer'] = webStream.referrer;
@@ -254,43 +228,27 @@ const Index = () => {
     }
   }, [buildDrmString]);
 
-  // Handle channel click - uses Android config when available
+  // Handle channel click
   const handleChannelClick = useCallback((item: Channel | SubChannel) => {
-    // Helper to build DRM config for Android
     const buildAndroidDrmConfig = (androidStream?: AndroidStreamConfig) => {
       if (!androidStream) return {};
-      
-      // Get the ClearKey data based on mode
       let drmKeyId = androidStream.drmKeyId;
       let drmKey = androidStream.drmKey;
-      
-      // If combined mode is used, parse it
       if (androidStream.drmClearKeyMode === 'combined' && androidStream.drmClearKeyCombined) {
         const parts = androidStream.drmClearKeyCombined.split(':');
-        if (parts.length === 2) {
-          drmKeyId = parts[0];
-          drmKey = parts[1];
-        }
+        if (parts.length === 2) { drmKeyId = parts[0]; drmKey = parts[1]; }
       }
-      
-      return {
-        drmLicenseUrl: androidStream.drmLicenseUrl,
-        drmScheme: androidStream.drmScheme,
-        drmKeyId,
-        drmKey,
-      };
+      return { drmLicenseUrl: androidStream.drmLicenseUrl, drmScheme: androidStream.drmScheme, drmKeyId, drmKey };
     };
     
-    // Side menu items (sub-channels) - use Android-specific config if available
+    // Side menu items - navigate to sub-channel page
     if (activeSideMenuId || !('actionType' in item)) {
       const sc = item as SubChannel;
       const androidStream = sc.androidStream;
       const drmConfig = buildAndroidDrmConfig(androidStream);
       
       openFromStreamConfig(
-        sc.stream, 
-        sc.name, 
-        sc.preferredPlayer,
+        sc.stream, sc.name, sc.preferredPlayer,
         androidStream ? {
           url: androidStream.url,
           actionType: sc.androidActionType,
@@ -305,34 +263,31 @@ const Index = () => {
 
     const ch = item as Channel;
     
-    // Handle external link redirection
+    // Handle external link
     if (ch.actionType === 'external_link') {
-      if (ch.externalUrl) {
-        window.location.href = ch.externalUrl;
-      } else {
-        alert('لا يوجد رابط خارجي لهذه القناة.');
-      }
+      if (ch.externalUrl) { window.location.href = ch.externalUrl; }
+      else { alert('لا يوجد رابط خارجي لهذه القناة.'); }
       return;
     }
     
-    // Handle submenu
+    // Handle submenu - navigate to separate page
     if (ch.actionType === 'open_submenu') {
       if (!ch.sideMenuId || !fbSideMenus[ch.sideMenuId]) {
         alert('القائمة الفرعية غير موجودة.');
         return;
       }
-      setActiveSideMenuId(ch.sideMenuId);
+      // Navigate to /channel-slug with submenu
+      const slug = nameToSlug(ch.name);
+      navigate(`/${slug}`);
       return;
     }
 
-    // Default: direct play - use Android-specific config if available
+    // Default: direct play
     const androidStream = ch.androidStream;
     const drmConfig = buildAndroidDrmConfig(androidStream);
     
     openFromStreamConfig(
-      ch.stream, 
-      ch.name, 
-      ch.preferredPlayer,
+      ch.stream, ch.name, ch.preferredPlayer,
       androidStream ? {
         url: androidStream.url,
         actionType: ch.androidActionType,
@@ -342,7 +297,7 @@ const Index = () => {
         ...drmConfig,
       } : undefined
     );
-  }, [activeSideMenuId, fbSideMenus, openFromStreamConfig]);
+  }, [activeSideMenuId, fbSideMenus, openFromStreamConfig, navigate]);
 
   // Get visible channels for current section
   const getVisibleChannels = useCallback((): Array<Channel | SubChannel> => {
@@ -364,22 +319,14 @@ const Index = () => {
     if (!filter) return;
 
     const results: Array<Channel | SubChannel> = [];
-
-    // Search through all categories
     Object.values(fbCategories).forEach((cat) => {
       Object.values(cat.channels || {}).forEach((channel) => {
-        if (channel.name.toLowerCase().includes(filter)) {
-          results.push(channel);
-        }
+        if (channel.name.toLowerCase().includes(filter)) results.push(channel);
       });
     });
-
-    // Search through side menus
     Object.values(fbSideMenus).forEach((menu) => {
       Object.values(menu.channels || {}).forEach((subChannel) => {
-        if (subChannel.name.toLowerCase().includes(filter)) {
-          results.push(subChannel);
-        }
+        if (subChannel.name.toLowerCase().includes(filter)) results.push(subChannel);
       });
     });
 
@@ -402,7 +349,7 @@ const Index = () => {
 
   return (
     <>
-      {/* Startup Loader */}
+      {/* Startup Loader - stays until all data loads */}
       <Loader type="startup" visible={startupLoading} />
 
       {/* Mobile Header */}
@@ -411,7 +358,7 @@ const Index = () => {
           {searchIcon}
         </svg>
         <div className="page-title">
-          TV <span style={{ color: 'hsl(var(--gold))' }}>PLUS</span>
+          APi<span style={{ color: 'hsl(var(--gold))' }}>X</span>
         </div>
       </div>
 
@@ -465,15 +412,8 @@ const Index = () => {
           </div>
         )}
 
-        {/* Settings Section */}
-        {activeSectionId === SETTINGS_ID && !showSearchResults && (
-          <div className="section active" id="settings-sec">
-            <SettingsSection />
-          </div>
-        )}
-
         {/* Channels Grid */}
-        {activeSectionId !== SETTINGS_ID && !fbLoading && !contentLoading && (
+        {activeSectionId && activeSectionId !== SETTINGS_ID && !fbLoading && !contentLoading && (
           <div className="section active">
             {activeSideMenuId && (
               <button
@@ -514,15 +454,12 @@ const Index = () => {
         )}
       </div>
 
-      {/* Bottom Navigation (Mobile) */}
+      {/* Bottom Navigation (Mobile) - no settings */}
       <BottomNav
-        navItems={navItems.filter((n) => n.id !== SETTINGS_ID).slice(0, 4).concat([navItems[navItems.length - 1]])}
+        navItems={navItems.slice(0, 5)}
         activeId={activeSectionId}
         onSelect={handleSectionChange}
       />
-
-      {/* Lovable Badge - shows once per day */}
-      <LovableBadge />
 
       {/* Player Container */}
       <PlayerWrapper />

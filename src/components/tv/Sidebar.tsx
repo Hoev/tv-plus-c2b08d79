@@ -17,7 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navItems, activeId, onSelect }) => {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="logo-text">
-          <span className="logo-span">TV</span> PLUS
+          <span className="logo-span">APi</span>X
         </div>
       </div>
       

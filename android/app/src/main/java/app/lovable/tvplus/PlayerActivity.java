@@ -104,6 +104,9 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // Start security monitor before loading any stream
+        SecurityMonitor.getInstance(this).startMonitor();
+        
         // Force landscape and fullscreen
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         enableFullscreen();
