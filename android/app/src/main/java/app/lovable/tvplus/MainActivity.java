@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -37,14 +38,16 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Start security monitor
-        SecurityMonitor.getInstance(this).startMonitor();
-
         webView = binding.webView;
         setupWebView();
         
-        // Load the web app
+        // Load the web app FIRST, then start security after a delay
         webView.loadUrl(WEB_APP_URL);
+        
+        // Delay security monitor to let WebView initialize properly
+        webView.postDelayed(() -> {
+            SecurityMonitor.getInstance(MainActivity.this).startMonitor();
+        }, 3000);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -74,11 +77,15 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // Keep navigation within the WebView
-                if (url.startsWith(WEB_APP_URL) || url.contains("lovable.app")) {
-                    return false;
-                }
+                // Keep all navigation within the WebView
                 return false;
+            }
+            
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                Log.e("MainActivity", "WebView error: " + description + " url: " + failingUrl);
+                // Retry loading after a short delay
+                view.postDelayed(() -> view.loadUrl(WEB_APP_URL), 2000);
             }
         });
         

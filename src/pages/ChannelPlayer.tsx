@@ -215,8 +215,8 @@ const ChannelPlayer: React.FC = () => {
 
       {/* Channel Grid */}
       <div style={{
-        width: '100%', maxWidth: 1100, display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)', gap: 15, paddingBottom: 40,
+        width: '100%', maxWidth: 1200, display: 'grid',
+        gap: 20, paddingBottom: 40, paddingLeft: 20, paddingRight: 20,
         animation: 'fadeIn 0.5s ease-in-out',
       }}
         className="subchannel-grid"
@@ -284,16 +284,27 @@ const ChannelPlayer: React.FC = () => {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @media (orientation: landscape) {
+        .subchannel-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        @media (min-width: 768px) {
+          .subchannel-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+        }
+        @media (min-width: 1024px), (orientation: landscape) {
           .subchannel-grid {
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 20px !important;
           }
         }
+        .subchannel-card {
+          aspect-ratio: 16/9 !important;
+        }
         .subchannel-card:focus {
           border-color: #FFC107 !important;
-          transform: scale(1.05);
-          box-shadow: 0 0 25px rgba(255, 193, 7, 0.4);
+          transform: scale(1.03);
+          box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
           z-index: 10;
           outline: none;
         }
