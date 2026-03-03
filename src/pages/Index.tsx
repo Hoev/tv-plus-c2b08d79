@@ -65,7 +65,9 @@ const Index = () => {
   const navigate = useNavigate();
 
   const sortedCategories = useMemo(
-    () => Object.values(fbCategories).sort((a, b) => a.sortOrder - b.sortOrder),
+    () => Object.values(fbCategories)
+      .filter((cat) => !cat.hidden)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     [fbCategories]
   );
 
@@ -306,10 +308,12 @@ const Index = () => {
 
     if (activeSideMenuId) {
       return Object.values(fbSideMenus[activeSideMenuId]?.channels || {})
+        .filter((ch) => !(ch as any).hidden)
         .sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
     return Object.values(fbCategories[activeSectionId]?.channels || {})
+      .filter((ch) => !ch.hidden)
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [activeSectionId, activeSideMenuId, fbCategories, fbSideMenus, showSearchResults, searchResults]);
 

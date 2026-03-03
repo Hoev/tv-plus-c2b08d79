@@ -63,6 +63,7 @@ export interface SubChannel {
   stream: StreamConfig;
   sortOrder: number;
   preferredPlayer?: WebPlayerType;
+  hidden?: boolean;
   
   // Android-specific
   androidStream?: AndroidStreamConfig;
@@ -82,16 +83,17 @@ export interface Channel {
   imageUrl: string;
   sortOrder: number;
   actionType: ActionType;
+  hidden?: boolean;
   
   // === Web Settings ===
   stream?: StreamConfig;
   sideMenuId?: string;
-  externalUrl?: string; // For external link redirection
-  preferredPlayer?: WebPlayerType; // Per-channel web player selection
+  externalUrl?: string;
+  preferredPlayer?: WebPlayerType;
   
   // === Android Settings ===
   androidStream?: AndroidStreamConfig;
-  androidActionType?: AndroidActionType; // 'native', 'webview', 'intent'
+  androidActionType?: AndroidActionType;
 }
 
 export interface Category {
@@ -99,6 +101,16 @@ export interface Category {
   name: string;
   sortOrder: number;
   channels: Record<string, Channel>;
+  hidden?: boolean;
+  adGateEnabled?: boolean; // Require watching ad before accessing this section
+}
+
+// AdMob configuration stored in Firebase
+export interface AdConfig {
+  admobBannerId?: string;
+  admobInterstitialId?: string;
+  admobRewardedId?: string;
+  adsEnabled?: boolean;
 }
 
 export interface AdminData {

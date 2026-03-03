@@ -77,6 +77,7 @@ const ChannelPlayer: React.FC = () => {
     const ch = channelWithSubmenu as Channel;
     if (ch.actionType === 'open_submenu' && ch.sideMenuId && sideMenus[ch.sideMenuId]) {
       return Object.values(sideMenus[ch.sideMenuId].channels || {})
+        .filter((sc) => !sc.hidden)
         .sort((a, b) => a.sortOrder - b.sortOrder);
     }
     return [];

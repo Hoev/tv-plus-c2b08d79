@@ -5,9 +5,10 @@ import { Category } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Plus, Edit2, Trash2, GripVertical, Folder } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, Folder, Eye, EyeOff } from 'lucide-react';
 
 interface CategoryManagerProps {
   onSelectCategory: (category: Category | null) => void;
@@ -211,10 +212,29 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ onSelectCategory, sel
                 </Button>
               </div>
               <Folder className="w-5 h-5 text-primary" />
-              <span className="flex-1 font-medium text-foreground">{category.name}</span>
+              <span className={`flex-1 font-medium ${category.hidden ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                {category.name}
+                {category.hidden && <span className="text-xs text-amber-500 mr-2">(مخفي)</span>}
+              </span>
               <span className="text-xs text-muted-foreground">
                 {Object.keys(category.channels || {}).length} قناة
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                title={category.hidden ? 'إظهار القسم' : 'إخفاء القسم'}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await update(ref(db, `categories/${category.id}`), { hidden: !category.hidden });
+                  } catch (err) {
+                    console.error('Toggle hidden error:', err);
+                  }
+                }}
+              >
+                {category.hidden ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Eye className="w-4 h-4" />}
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
