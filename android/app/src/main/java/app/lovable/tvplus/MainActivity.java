@@ -41,6 +41,9 @@ public class MainActivity extends AppCompatActivity {
         webView = binding.webView;
         setupWebView();
         
+        // Initialize AdMob
+        AdManager.getInstance().init(this);
+        
         // Load the web app FIRST, then start security after a delay
         webView.loadUrl(WEB_APP_URL);
         
@@ -112,23 +115,41 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                     
-                    // Handle different action types
-                    if (config.isIntentAction() && config.intentUri != null) {
-                        // Launch external app via Intent URI
-                        launchIntent(config.intentUri);
-                    } else if (config.isWebViewAction()) {
-                        // Open in WebView Activity
-                        openWebView(config.url, config.title);
-                    } else {
-                        // Default: Native player
-                        openNativePlayer(jsonConfig);
-                    }
+                    // Show interstitial ad before playing (if enabled)
+                    AdManager.getInstance().showInterstitial(MainActivity.this, new AdManager.AdCallback() {
+                        @Override
+                        public void onAdCompleted() {
+                            launchPlayer(config, jsonConfig);
+                        }
+                        
+                        @Override
+                        public void onAdFailed() {
+                            launchPlayer(config, jsonConfig);
+                        }
+                    });
                     
                 } catch (Exception e) {
                     Toast.makeText(MainActivity.this, 
                         "Error: " + e.getMessage(), 
                         Toast.LENGTH_SHORT).show();
                 }
+            });
+        }
+        
+        @JavascriptInterface
+        public void checkAdGate(String categoryId) {
+            runOnUiThread(() -> {
+                AdManager.getInstance().checkAdGate(categoryId, MainActivity.this, new AdManager.AdCallback() {
+                    @Override
+                    public void onAdCompleted() {
+                        webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(true)", null);
+                    }
+                    
+                    @Override
+                    public void onAdFailed() {
+                        webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(false)", null);
+                    }
+                });
             });
         }
         
@@ -145,6 +166,16 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public String getAppVersion() {
             return "1.0.0";
+        }
+    }
+    
+    private void launchPlayer(StreamConfig config, String jsonConfig) {
+        if (config.isIntentAction() && config.intentUri != null) {
+            launchIntent(config.intentUri);
+        } else if (config.isWebViewAction()) {
+            openWebView(config.url, config.title);
+        } else {
+            openNativePlayer(jsonConfig);
         }
     }
     

@@ -8,6 +8,7 @@ interface AndroidInterface {
   showToast: (message: string) => void;
   isAndroidApp: () => boolean;
   getAppVersion?: () => string;
+  checkAdGate?: (categoryId: string) => void;
 }
 
 interface AndroidHeaders {

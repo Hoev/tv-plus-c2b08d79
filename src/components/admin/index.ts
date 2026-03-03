@@ -6,3 +6,4 @@ export { default as PlayerConfigForm } from './PlayerConfigForm';
 export { default as NotificationManager } from './NotificationManager';
 export { default as WebConfigForm } from './WebConfigForm';
 export { default as AndroidConfigForm } from './AndroidConfigForm';
+export { default as AdConfigManager } from './AdConfigManager';

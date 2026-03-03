@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ImageUploader from './ImageUploader';
 import WebConfigForm from './WebConfigForm';
 import AndroidConfigForm from './AndroidConfigForm';
-import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, Globe, Smartphone } from 'lucide-react';
+import { Plus, Edit2, Trash2, Menu, Tv, ChevronUp, ChevronDown, Globe, Smartphone, Eye, EyeOff } from 'lucide-react';
 
 const SideMenuManager: React.FC = () => {
   const [sideMenus, setSideMenus] = useState<Record<string, SideMenu>>({});
@@ -331,7 +331,10 @@ const SideMenuManager: React.FC = () => {
                             </div>
                             
                             <div className="flex-1">
-                              <span className="font-medium text-foreground block">{channel.name}</span>
+                              <span className={`font-medium block ${channel.hidden ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                                {channel.name}
+                                {channel.hidden && <span className="text-xs text-amber-500 mr-2"> (مخفي)</span>}
+                              </span>
                               <div className="flex items-center gap-2 mt-1">
                                 {channel.stream?.url && (
                                   <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">
@@ -348,6 +351,21 @@ const SideMenuManager: React.FC = () => {
                               </div>
                             </div>
                             
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title={channel.hidden ? 'إظهار القناة' : 'إخفاء القناة'}
+                              onClick={async () => {
+                                try {
+                                  await update(ref(db, `sideMenus/${menu.id}/channels/${channel.id}`), { hidden: !channel.hidden });
+                                } catch (err) {
+                                  console.error('Toggle hidden error:', err);
+                                }
+                              }}
+                            >
+                              {channel.hidden ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Eye className="w-4 h-4" />}
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"

@@ -61,4 +61,7 @@ dependencies {
     
     // Leanback for TV support (optional)
     implementation 'androidx.leanback:leanback:1.0.0'
+    
+    // Google Mobile Ads (AdMob)
+    implementation 'com.google.android.gms:play-services-ads:23.0.0'
 }

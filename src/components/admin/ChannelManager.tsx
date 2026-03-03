@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ImageUploader from './ImageUploader';
 import WebConfigForm from './WebConfigForm';
 import AndroidConfigForm from './AndroidConfigForm';
-import { Plus, Edit2, Trash2, Play, Menu, Tv, ChevronUp, ChevronDown, ExternalLink, Globe, Smartphone } from 'lucide-react';
+import { Plus, Edit2, Trash2, Play, Menu, Tv, ChevronUp, ChevronDown, ExternalLink, Globe, Smartphone, Eye, EyeOff } from 'lucide-react';
 
 interface ChannelManagerProps {
   category: Category;
@@ -303,7 +303,10 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                 </div>
                 
                 <div className="flex-1">
-                  <p className="font-medium text-foreground">{channel.name}</p>
+                  <p className={`font-medium ${channel.hidden ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                    {channel.name}
+                    {channel.hidden && <span className="text-xs text-amber-500 mr-2"> (مخفي)</span>}
+                  </p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     {channel.actionType === 'direct_play' ? (
                       <>
@@ -330,6 +333,20 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                   </div>
                 </div>
                 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title={channel.hidden ? 'إظهار القناة' : 'إخفاء القناة'}
+                  onClick={async () => {
+                    try {
+                      await update(ref(db, `categories/${sectionId}/channels/${channel.id}`), { hidden: !channel.hidden });
+                    } catch (err) {
+                      console.error('Toggle hidden error:', err);
+                    }
+                  }}
+                >
+                  {channel.hidden ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Eye className="w-4 h-4" />}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
