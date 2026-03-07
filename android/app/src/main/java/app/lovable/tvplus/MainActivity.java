@@ -41,9 +41,6 @@ public class MainActivity extends AppCompatActivity {
         webView = binding.webView;
         setupWebView();
         
-        // Initialize AdMob
-        AdManager.getInstance().init(this);
-        
         // Load the web app FIRST, then start security after a delay
         webView.loadUrl(WEB_APP_URL);
         
