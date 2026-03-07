@@ -56,9 +56,10 @@ dependencies {
     // Gson for JSON parsing
     implementation 'com.google.code.gson:gson:2.10.1'
     
-    // Firebase Cloud Messaging
+    // Firebase
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-database'
     
     // Leanback for TV support (optional)
     implementation 'androidx.leanback:leanback:1.0.0'

@@ -216,8 +216,8 @@ const ChannelPlayer: React.FC = () => {
 
       {/* Channel Grid */}
       <div style={{
-        width: '100%', maxWidth: 1200, display: 'grid',
-        gap: 20, paddingBottom: 40, paddingLeft: 20, paddingRight: 20,
+        width: '100%', maxWidth: '100%', display: 'grid',
+        gap: 16, paddingBottom: 40, paddingLeft: 20, paddingRight: 20,
         animation: 'fadeIn 0.5s ease-in-out',
       }}
         className="subchannel-grid"
