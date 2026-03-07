@@ -41,9 +41,6 @@ public class MainActivity extends AppCompatActivity {
         webView = binding.webView;
         setupWebView();
         
-        // Initialize AdMob
-        AdManager.getInstance().init(this);
-        
         // Load the web app FIRST, then start security after a delay
         webView.loadUrl(WEB_APP_URL);
         
@@ -115,18 +112,7 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                     
-                    // Show interstitial ad before playing (if enabled)
-                    AdManager.getInstance().showInterstitial(MainActivity.this, new AdManager.AdCallback() {
-                        @Override
-                        public void onAdCompleted() {
-                            launchPlayer(config, jsonConfig);
-                        }
-                        
-                        @Override
-                        public void onAdFailed() {
-                            launchPlayer(config, jsonConfig);
-                        }
-                    });
+                    launchPlayer(config, jsonConfig);
                     
                 } catch (Exception e) {
                     Toast.makeText(MainActivity.this, 
@@ -138,18 +124,9 @@ public class MainActivity extends AppCompatActivity {
         
         @JavascriptInterface
         public void checkAdGate(String categoryId) {
+            // Ad gate disabled - always allow
             runOnUiThread(() -> {
-                AdManager.getInstance().checkAdGate(categoryId, MainActivity.this, new AdManager.AdCallback() {
-                    @Override
-                    public void onAdCompleted() {
-                        webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(true)", null);
-                    }
-                    
-                    @Override
-                    public void onAdFailed() {
-                        webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(false)", null);
-                    }
-                });
+                webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(true)", null);
             });
         }
         
