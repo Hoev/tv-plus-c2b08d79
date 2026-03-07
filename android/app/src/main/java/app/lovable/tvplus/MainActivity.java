@@ -112,18 +112,7 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                     
-                    // Show interstitial ad before playing (if enabled)
-                    AdManager.getInstance().showInterstitial(MainActivity.this, new AdManager.AdCallback() {
-                        @Override
-                        public void onAdCompleted() {
-                            launchPlayer(config, jsonConfig);
-                        }
-                        
-                        @Override
-                        public void onAdFailed() {
-                            launchPlayer(config, jsonConfig);
-                        }
-                    });
+                    launchPlayer(config, jsonConfig);
                     
                 } catch (Exception e) {
                     Toast.makeText(MainActivity.this, 
