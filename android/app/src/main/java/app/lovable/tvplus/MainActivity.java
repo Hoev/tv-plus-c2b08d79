@@ -124,18 +124,9 @@ public class MainActivity extends AppCompatActivity {
         
         @JavascriptInterface
         public void checkAdGate(String categoryId) {
+            // Ad gate disabled - always allow
             runOnUiThread(() -> {
-                AdManager.getInstance().checkAdGate(categoryId, MainActivity.this, new AdManager.AdCallback() {
-                    @Override
-                    public void onAdCompleted() {
-                        webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(true)", null);
-                    }
-                    
-                    @Override
-                    public void onAdFailed() {
-                        webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(false)", null);
-                    }
-                });
+                webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(true)", null);
             });
         }
         
