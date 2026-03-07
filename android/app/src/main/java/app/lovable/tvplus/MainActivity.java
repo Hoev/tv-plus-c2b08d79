@@ -29,7 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private Gson gson = new Gson();
     
     // Your web app URL
-    private static final String WEB_APP_URL = "https://tv-plus.lovable.app";
+    private static final String WEB_APP_URL = "https://tv-plus-c2b08d79.vercel.app";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
