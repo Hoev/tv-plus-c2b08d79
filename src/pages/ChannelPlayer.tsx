@@ -287,29 +287,14 @@ const ChannelPlayer: React.FC = () => {
         }
         .subchannel-grid {
           grid-template-columns: repeat(2, 1fr);
+          max-width: 1100px;
+          gap: 15px;
         }
-        @media (min-width: 768px) {
-          .subchannel-grid {
-            grid-template-columns: repeat(3, 1fr) !important;
-          }
-        }
-        @media (min-width: 1024px) {
+        @media (orientation: landscape) {
           .subchannel-grid {
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 20px !important;
-          }
-        }
-        @media (orientation: landscape) and (max-height: 500px) {
-          .subchannel-grid {
-            grid-template-columns: repeat(4, 1fr) !important;
-            gap: 12px !important;
-            max-width: 100% !important;
-            padding-left: 40px !important;
-            padding-right: 40px !important;
-          }
-          .subchannel-card {
-            aspect-ratio: 16/9 !important;
-            border-radius: 10px !important;
+            max-width: 1100px !important;
           }
         }
         .subchannel-card {
@@ -317,8 +302,8 @@ const ChannelPlayer: React.FC = () => {
         }
         .subchannel-card:focus {
           border-color: #FFC107 !important;
-          transform: scale(1.03);
-          box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
+          transform: scale(1.05);
+          box-shadow: 0 0 25px rgba(255, 193, 7, 0.4);
           z-index: 10;
           outline: none;
         }
