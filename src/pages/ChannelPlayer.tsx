@@ -140,6 +140,14 @@ const ChannelPlayer: React.FC = () => {
     }
   }, [loading, isPlayerMode, channelWithSubmenu]);
 
+  // Make sub-channel page fully independent from main TV layout styles
+  useEffect(() => {
+    document.body.classList.add('subchannel-page-active');
+    return () => {
+      document.body.classList.remove('subchannel-page-active');
+    };
+  }, []);
+
   if (loading) {
     return (
       <div style={{
@@ -265,8 +273,8 @@ const ChannelPlayer: React.FC = () => {
               background: 'linear-gradient(to top, rgba(0,0,0,0.95), transparent)', zIndex: 2,
             }} />
             <div style={{ position: 'relative', zIndex: 3, padding: '8px 12px', textAlign: 'right', width: '100%' }}>
-              <span style={{
-                color: '#fff', fontSize: 16, fontWeight: 700,
+              <span className="subchannel-title" style={{
+                color: '#fff', fontWeight: 700,
                 textShadow: '0 2px 4px rgba(0,0,0,0.9)',
                 display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
@@ -299,14 +307,25 @@ const ChannelPlayer: React.FC = () => {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           width: 100%;
           max-width: none;
-          gap: 15px;
+          gap: 16px;
+        }
+        .subchannel-title {
+          font-size: 17px;
         }
         @media (orientation: landscape) {
+          body.subchannel-page-active {
+            padding-right: 0 !important;
+            overflow: auto !important;
+            flex-direction: column !important;
+          }
           .subchannel-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
             gap: 20px !important;
             max-width: none !important;
             width: 100% !important;
+          }
+          .subchannel-title {
+            font-size: 20px;
           }
         }
         .subchannel-card {
