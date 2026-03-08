@@ -307,14 +307,25 @@ const ChannelPlayer: React.FC = () => {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           width: 100%;
           max-width: none;
-          gap: 15px;
+          gap: 16px;
+        }
+        .subchannel-title {
+          font-size: 17px;
         }
         @media (orientation: landscape) {
+          body.subchannel-page-active {
+            padding-right: 0 !important;
+            overflow: auto !important;
+            flex-direction: column !important;
+          }
           .subchannel-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
             gap: 20px !important;
             max-width: none !important;
             width: 100% !important;
+          }
+          .subchannel-title {
+            font-size: 20px;
           }
         }
         .subchannel-card {
