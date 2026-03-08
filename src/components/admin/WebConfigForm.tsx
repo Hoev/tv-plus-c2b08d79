@@ -94,25 +94,25 @@ const WebConfigForm: React.FC<WebConfigFormProps> = ({
               <SelectItem value="vlc">
                 <div className="flex items-center gap-2">
                   <span>🎬</span>
-                  <span>VLC (مجاني)</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="nplayer">
-                <div className="flex items-center gap-2">
-                  <span>▶️</span>
-                  <span>nPlayer (مدفوع)</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="infuse">
-                <div className="flex items-center gap-2">
-                  <span>🎥</span>
-                  <span>Infuse (مجاني + مدفوع)</span>
+                  <span>VLC (مجاني - الأشهر)</span>
                 </div>
               </SelectItem>
               <SelectItem value="outplayer">
                 <div className="flex items-center gap-2">
                   <span>📺</span>
                   <span>Outplayer (مجاني)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="infuse">
+                <div className="flex items-center gap-2">
+                  <span>🎥</span>
+                  <span>Infuse (مجاني)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="kmplayer">
+                <div className="flex items-center gap-2">
+                  <span>🎞️</span>
+                  <span>KMPlayer (مجاني)</span>
                 </div>
               </SelectItem>
             </SelectContent>

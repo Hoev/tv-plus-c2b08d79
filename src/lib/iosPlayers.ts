@@ -14,14 +14,11 @@ export const IOS_PLAYERS: Record<iOSPlayerApp, PlayerInfo> = {
     appStoreUrl: 'https://apps.apple.com/app/vlc-media-player/id650377962',
     icon: '🎬',
   },
-  nplayer: {
-    name: 'nPlayer',
-    scheme: (url) => {
-      const proto = url.startsWith('https') ? 'nplayer-https' : 'nplayer-http';
-      return `${proto}://${url.replace(/^https?:\/\//, '')}`;
-    },
-    appStoreUrl: 'https://apps.apple.com/app/nplayer/id1116905928',
-    icon: '▶️',
+  outplayer: {
+    name: 'Outplayer',
+    scheme: (url) => `outplayer://${url}`,
+    appStoreUrl: 'https://apps.apple.com/app/outplayer/id1449923287',
+    icon: '📺',
   },
   infuse: {
     name: 'Infuse',
@@ -29,11 +26,11 @@ export const IOS_PLAYERS: Record<iOSPlayerApp, PlayerInfo> = {
     appStoreUrl: 'https://apps.apple.com/app/infuse-7/id1136220934',
     icon: '🎥',
   },
-  outplayer: {
-    name: 'Outplayer',
-    scheme: (url) => `outplayer://${url}`,
-    appStoreUrl: 'https://apps.apple.com/app/outplayer/id1449923287',
-    icon: '📺',
+  kmplayer: {
+    name: 'KMPlayer',
+    scheme: (url) => `kmplayer://${url}`,
+    appStoreUrl: 'https://apps.apple.com/app/kmplayer-play-videos-music/id835843824',
+    icon: '🎞️',
   },
 };
 
