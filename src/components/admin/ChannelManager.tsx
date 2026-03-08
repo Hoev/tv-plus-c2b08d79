@@ -107,6 +107,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       sideMenuId: channel.sideMenuId || '',
       externalUrl: channel.externalUrl || '',
       preferredPlayer: channel.preferredPlayer || 'default',
+      iosPlayerApp: channel.iosPlayerApp,
       androidStream: channel.androidStream || { url: '' },
       androidActionType: channel.androidActionType || 'native'
     });
