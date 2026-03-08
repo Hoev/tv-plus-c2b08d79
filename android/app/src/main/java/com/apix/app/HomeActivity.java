@@ -2,6 +2,7 @@ package com.apix.app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -32,22 +33,31 @@ import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Native Home Activity - replaces WebView with native Android UI
- * Fetches data from Firebase and displays categories + channels
+ * Native Home Activity with responsive layout:
+ * - Portrait: Bottom nav bar with categories, channels grid above
+ * - Landscape/TV: Side nav with app name + categories, channels grid on right
  */
 public class HomeActivity extends AppCompatActivity {
 
     private static final String TAG = "HomeActivity";
 
-    private RecyclerView categoriesRecycler;
-    private RecyclerView channelsRecycler;
-    private TextView categoryTitle;
+    // Portrait views
+    private LinearLayout portraitLayout;
+    private RecyclerView categoriesRecyclerPortrait;
+    private RecyclerView channelsRecyclerPortrait;
+    private TextView categoryTitlePortrait;
+
+    // Landscape views
+    private LinearLayout landscapeLayout;
+    private RecyclerView categoriesRecyclerLandscape;
+    private RecyclerView channelsRecyclerLandscape;
+    private TextView categoryTitleLandscape;
+
     private ProgressBar loadingBar;
     private LinearLayout errorLayout;
     private TextView errorText;
@@ -59,8 +69,13 @@ public class HomeActivity extends AppCompatActivity {
     private Map<String, FirebaseModels.SideMenu> sideMenus = new HashMap<>();
     private FirebaseModels.Category selectedCategory;
 
-    private CategoryAdapter categoryAdapter;
-    private ChannelAdapter channelAdapter;
+    // Adapters for both modes
+    private CategoryAdapter categoryAdapterPortrait;
+    private CategoryAdapter categoryAdapterLandscape;
+    private ChannelAdapter channelAdapterPortrait;
+    private ChannelAdapter channelAdapterLandscape;
+
+    private boolean isLandscape = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,33 +98,80 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        categoriesRecycler = findViewById(R.id.categories_recycler);
-        channelsRecycler = findViewById(R.id.channels_recycler);
-        categoryTitle = findViewById(R.id.category_title);
+        // Common
         loadingBar = findViewById(R.id.loading_bar);
         errorLayout = findViewById(R.id.error_layout);
         errorText = findViewById(R.id.error_text);
 
-        // Categories - horizontal list
-        categoriesRecycler.setLayoutManager(
-            new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-        categoryAdapter = new CategoryAdapter(this, categories, category -> {
-            selectedCategory = category;
-            categoryTitle.setText(category.name);
-            updateChannels();
-        });
-        categoriesRecycler.setAdapter(categoryAdapter);
+        // Portrait
+        portraitLayout = findViewById(R.id.portrait_layout);
+        categoriesRecyclerPortrait = findViewById(R.id.categories_recycler);
+        channelsRecyclerPortrait = findViewById(R.id.channels_recycler);
+        categoryTitlePortrait = findViewById(R.id.category_title);
 
-        // Channels - grid
-        int spanCount = getResources().getConfiguration().orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
-        channelsRecycler.setLayoutManager(new GridLayoutManager(this, spanCount));
-        channelAdapter = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
-        channelsRecycler.setAdapter(channelAdapter);
+        // Landscape
+        landscapeLayout = findViewById(R.id.landscape_layout);
+        categoriesRecyclerLandscape = findViewById(R.id.categories_recycler_landscape);
+        channelsRecyclerLandscape = findViewById(R.id.channels_recycler_landscape);
+        categoryTitleLandscape = findViewById(R.id.category_title_landscape);
+
+        // Setup portrait adapters (horizontal categories at bottom)
+        categoriesRecyclerPortrait.setLayoutManager(
+            new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        categoryAdapterPortrait = new CategoryAdapter(this, categories, this::onCategorySelected);
+        categoryAdapterPortrait.setSideMode(false);
+        categoriesRecyclerPortrait.setAdapter(categoryAdapterPortrait);
+
+        channelsRecyclerPortrait.setLayoutManager(new GridLayoutManager(this, 2));
+        channelAdapterPortrait = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
+        channelsRecyclerPortrait.setAdapter(channelAdapterPortrait);
+
+        // Setup landscape adapters (vertical categories on side)
+        categoriesRecyclerLandscape.setLayoutManager(
+            new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
+        categoryAdapterLandscape = new CategoryAdapter(this, categories, this::onCategorySelected);
+        categoryAdapterLandscape.setSideMode(true);
+        categoriesRecyclerLandscape.setAdapter(categoryAdapterLandscape);
+
+        channelsRecyclerLandscape.setLayoutManager(new GridLayoutManager(this, 4));
+        channelAdapterLandscape = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
+        channelsRecyclerLandscape.setAdapter(channelAdapterLandscape);
+
+        // Apply initial layout
+        applyLayout();
+    }
+
+    private void applyLayout() {
+        isLandscape = getResources().getConfiguration().orientation ==
+            Configuration.ORIENTATION_LANDSCAPE;
+
+        if (isLandscape) {
+            portraitLayout.setVisibility(View.GONE);
+            landscapeLayout.setVisibility(View.VISIBLE);
+        } else {
+            portraitLayout.setVisibility(View.VISIBLE);
+            landscapeLayout.setVisibility(View.GONE);
+        }
+    }
+
+    private void onCategorySelected(FirebaseModels.Category category) {
+        selectedCategory = category;
+
+        // Update both layouts
+        categoryTitlePortrait.setText(category.name);
+        categoryTitleLandscape.setText(category.name);
+
+        // Sync selection on both adapters
+        int pos = categories.indexOf(category);
+        if (pos >= 0) {
+            categoryAdapterPortrait.setSelected(pos);
+            categoryAdapterLandscape.setSelected(pos);
+        }
+
+        updateChannels();
     }
 
     private void initFirebase() {
-        // Initialize Firebase programmatically (no google-services.json needed)
         if (FirebaseApp.getApps(this).isEmpty()) {
             FirebaseOptions options = new FirebaseOptions.Builder()
                 .setApiKey("AIzaSyBxT35NMrvWYPJRvWek_NKeu8QtNInISC4")
@@ -127,7 +189,6 @@ public class HomeActivity extends AppCompatActivity {
         loadingBar.setVisibility(View.VISIBLE);
         errorLayout.setVisibility(View.GONE);
 
-        // Load categories
         dbRef.child("categories").addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -138,7 +199,6 @@ public class HomeActivity extends AppCompatActivity {
                         if (cat != null) {
                             cat.id = child.getKey();
                             if (!cat.hidden) {
-                                // Parse channels
                                 if (cat.channels == null) cat.channels = new HashMap<>();
                                 DataSnapshot channelsSnap = child.child("channels");
                                 for (DataSnapshot chSnap : channelsSnap.getChildren()) {
@@ -156,15 +216,18 @@ public class HomeActivity extends AppCompatActivity {
                     }
                 }
 
-                // Sort
                 Collections.sort(categories, (a, b) -> a.sortOrder - b.sortOrder);
-                categoryAdapter.updateData(categories);
 
-                // Select first category
+                // Update both adapters
+                categoryAdapterPortrait.updateData(categories);
+                categoryAdapterLandscape.updateData(categories);
+
                 if (!categories.isEmpty() && selectedCategory == null) {
                     selectedCategory = categories.get(0);
-                    categoryTitle.setText(selectedCategory.name);
-                    categoryAdapter.setSelected(0);
+                    categoryTitlePortrait.setText(selectedCategory.name);
+                    categoryTitleLandscape.setText(selectedCategory.name);
+                    categoryAdapterPortrait.setSelected(0);
+                    categoryAdapterLandscape.setSelected(0);
                     updateChannels();
                 }
 
@@ -179,7 +242,6 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
 
-        // Load side menus
         dbRef.child("sideMenus").addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -213,7 +275,10 @@ public class HomeActivity extends AppCompatActivity {
         }
 
         Collections.sort(channels, (a, b) -> a.sortOrder - b.sortOrder);
-        channelAdapter.updateData(channels);
+
+        // Update both adapters
+        channelAdapterPortrait.updateData(channels);
+        channelAdapterLandscape.updateData(channels);
     }
 
     private void onChannelClick(FirebaseModels.Channel channel) {
@@ -232,7 +297,7 @@ public class HomeActivity extends AppCompatActivity {
                     startActivity(browserIntent);
                 }
                 break;
-            default: // direct_play
+            default:
                 playChannel(channel);
                 break;
         }
@@ -254,7 +319,6 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void playChannel(FirebaseModels.Channel channel) {
-        // Build StreamConfig for PlayerActivity
         String androidAction = channel.androidActionType != null ? channel.androidActionType : "native";
 
         if ("intent".equals(androidAction) && channel.androidStream != null &&
@@ -273,8 +337,7 @@ public class HomeActivity extends AppCompatActivity {
             return;
         }
 
-        // Native player
-        com.apix.app.StreamConfig config = buildStreamConfig(channel);
+        StreamConfig config = buildStreamConfig(channel);
         if (config == null || config.url == null || config.url.isEmpty()) {
             Toast.makeText(this, "لا يوجد رابط بث", Toast.LENGTH_SHORT).show();
             return;
@@ -285,26 +348,24 @@ public class HomeActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private com.apix.app.StreamConfig buildStreamConfig(FirebaseModels.Channel channel) {
-        com.apix.app.StreamConfig config = new com.apix.app.StreamConfig();
+    private StreamConfig buildStreamConfig(FirebaseModels.Channel channel) {
+        StreamConfig config = new StreamConfig();
         config.title = channel.name;
 
         if (channel.androidStream != null && channel.androidStream.url != null) {
             config.url = channel.androidStream.url;
             config.actionType = channel.androidActionType;
 
-            // Headers
             if (channel.androidStream.headers != null) {
-                config.headers = new com.apix.app.StreamConfig.Headers();
+                config.headers = new StreamConfig.Headers();
                 config.headers.userAgent = channel.androidStream.headers.get("userAgent");
                 config.headers.referer = channel.androidStream.headers.get("referrer");
                 config.headers.cookie = channel.androidStream.headers.get("cookie");
                 config.headers.origin = channel.androidStream.headers.get("origin");
             }
 
-            // DRM
             if (channel.androidStream.drmScheme != null) {
-                config.drm = new com.apix.app.StreamConfig.DrmConfig();
+                config.drm = new StreamConfig.DrmConfig();
                 config.drm.scheme = channel.androidStream.drmScheme;
                 config.drm.licenseUrl = channel.androidStream.drmLicenseUrl;
 
@@ -319,21 +380,19 @@ public class HomeActivity extends AppCompatActivity {
                 config.drm.key = key;
             }
 
-            // Servers
             if (channel.androidStream.servers != null) {
                 config.servers = new ArrayList<>();
                 for (FirebaseModels.Server s : channel.androidStream.servers) {
-                    com.apix.app.StreamConfig.Server server = new com.apix.app.StreamConfig.Server();
+                    StreamConfig.Server server = new StreamConfig.Server();
                     server.name = s.name;
                     server.url = s.url;
                     config.servers.add(server);
                 }
             }
         } else if (channel.stream != null) {
-            // Fallback to web stream config
             config.url = channel.stream.url;
             if (channel.stream.userAgent != null || channel.stream.referrer != null) {
-                config.headers = new com.apix.app.StreamConfig.Headers();
+                config.headers = new StreamConfig.Headers();
                 config.headers.userAgent = channel.stream.userAgent;
                 config.headers.referer = channel.stream.referrer;
                 config.headers.cookie = channel.stream.cookies;
@@ -361,10 +420,15 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onConfigurationChanged(@NonNull android.content.res.Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        int spanCount = newConfig.orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
-        ((GridLayoutManager) channelsRecycler.getLayoutManager()).setSpanCount(spanCount);
+        applyLayout();
+
+        // Refresh data in active layout
+        if (!categories.isEmpty()) {
+            categoryAdapterPortrait.updateData(categories);
+            categoryAdapterLandscape.updateData(categories);
+            updateChannels();
+        }
     }
 }

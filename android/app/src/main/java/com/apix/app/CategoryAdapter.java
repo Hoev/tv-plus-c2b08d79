@@ -13,7 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
 /**
- * Adapter for category tabs (horizontal list)
+ * Adapter for category tabs - supports both horizontal (bottom) and vertical (side) modes
  */
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHolder> {
 
@@ -25,11 +25,16 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
     private List<FirebaseModels.Category> data;
     private OnCategoryClick listener;
     private int selectedPosition = 0;
+    private boolean isSideMode = false; // false=horizontal bottom, true=vertical side
 
     public CategoryAdapter(Context ctx, List<FirebaseModels.Category> data, OnCategoryClick listener) {
         this.context = ctx;
         this.data = data;
         this.listener = listener;
+    }
+
+    public void setSideMode(boolean sideMode) {
+        this.isSideMode = sideMode;
     }
 
     public void updateData(List<FirebaseModels.Category> newData) {
@@ -47,7 +52,8 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.item_category, parent, false);
+        int layout = isSideMode ? R.layout.item_category_side : R.layout.item_category;
+        View view = LayoutInflater.from(context).inflate(layout, parent, false);
         return new ViewHolder(view);
     }
 
@@ -66,14 +72,17 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
             listener.onClick(data.get(pos));
         });
 
+        // TV D-pad focus with strong visual feedback
         holder.itemView.setFocusable(true);
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
-            holder.name.setTextColor(hasFocus || (holder.getAdapterPosition() == selectedPosition)
-                ? Color.parseColor("#FFD700") : Color.WHITE);
-            if (hasFocus) v.setScaleX(1.1f);
-            else v.setScaleX(1.0f);
-            if (hasFocus) v.setScaleY(1.1f);
-            else v.setScaleY(1.0f);
+            if (hasFocus) {
+                holder.name.setTextColor(Color.parseColor("#FFD700"));
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(100).start();
+            } else {
+                boolean sel = holder.getAdapterPosition() == selectedPosition;
+                holder.name.setTextColor(sel ? Color.parseColor("#FFD700") : Color.WHITE);
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
+            }
         });
     }
 
