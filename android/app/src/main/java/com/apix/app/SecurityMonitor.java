@@ -450,11 +450,17 @@ public class SecurityMonitor {
     }
     
     private boolean detectDebugger() {
-        if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) return true;
+        // Skip debugger check in debug builds (Android Studio testing)
         try {
             ApplicationInfo appInfo = context.getApplicationInfo();
-            if ((appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) return true;
+            if ((appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+                // Debug build - skip all debugger checks to allow testing
+                return false;
+            }
         } catch (Exception ignored) {}
+        
+        // Release build - full debugger detection
+        if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) return true;
         try {
             BufferedReader reader = new BufferedReader(
                 new InputStreamReader(Runtime.getRuntime().exec("cat /proc/self/status").getInputStream()));
