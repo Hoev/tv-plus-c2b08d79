@@ -697,7 +697,6 @@ public class PlayerActivity extends AppCompatActivity {
                     Log.d(TAG, "Widevine License URL: " + streamConfig.drm.licenseUrl);
                 }
                 
-                // Add license headers if present
                 if (streamConfig.hasHeaders()) {
                     Map<String, String> licenseHeaders = new HashMap<>();
                     if (!streamConfig.getUserAgent().isEmpty()) {
@@ -720,52 +719,82 @@ public class PlayerActivity extends AppCompatActivity {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                 }
             } else {
-                // ClearKey - supports keyId:key format, separate fields, or license URL
+                // ClearKey
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID);
                 
                 String keyId = streamConfig.drm.keyId;
                 String key = streamConfig.drm.key;
+                String licenseUrl = streamConfig.drm.licenseUrl;
                 
-                // Check if we have combined keyId:key format in keyId field
-                if (keyId != null && keyId.contains(":") && (key == null || key.isEmpty())) {
-                    String[] parts = keyId.split(":");
-                    if (parts.length >= 2) {
-                        keyId = parts[0];
-                        // Handle case where key might contain "https:" etc by rejoining
-                        if (parts[1].startsWith("http")) {
-                            // This is a URL format like "keyid:https://..."
-                            // Use licenseUrl instead
-                            drmBuilder.setLicenseUri(keyId.substring(keyId.indexOf(":") + 1));
-                            Log.d(TAG, "ClearKey using URL from combined format");
-                            keyId = null;
-                            key = null;
-                        } else {
-                            key = parts[1];
-                            Log.d(TAG, "Parsed combined ClearKey format");
-                        }
+                // Strategy 1: License URL that returns ClearKey JSON (API endpoint)
+                if (licenseUrl != null && !licenseUrl.isEmpty() && 
+                    licenseUrl.startsWith("http") && (keyId == null || keyId.isEmpty())) {
+                    // Fetch key from API and build ClearKey JSON
+                    Log.d(TAG, "ClearKey: Using license API URL: " + licenseUrl);
+                    String clearKeyJson = fetchClearKeyFromApi(licenseUrl);
+                    if (clearKeyJson != null) {
+                        String dataUri = "data:application/json;base64," + 
+                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
+                        drmBuilder.setLicenseUri(dataUri);
+                        Log.d(TAG, "ClearKey: Built from API response");
+                    } else {
+                        // Fallback: pass URL directly, ExoPlayer may handle it
+                        drmBuilder.setLicenseUri(licenseUrl);
+                        Log.d(TAG, "ClearKey: Passing license URL directly");
                     }
                 }
-                
-                // Special handling for complex keys (like the ones with specific formats)
-                if (keyId != null && !keyId.isEmpty() && key != null && !key.isEmpty()) {
-                    // Validate hex format - remove any non-hex characters
+                // Strategy 2: keyId contains a URL (combined format like "keyid:https://...")
+                else if (keyId != null && keyId.contains("http")) {
+                    String apiUrl = keyId.contains(":http") ? 
+                        keyId.substring(keyId.indexOf("http")) : keyId;
+                    Log.d(TAG, "ClearKey: Extracted API URL from keyId: " + apiUrl);
+                    String clearKeyJson = fetchClearKeyFromApi(apiUrl);
+                    if (clearKeyJson != null) {
+                        String dataUri = "data:application/json;base64," + 
+                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
+                        drmBuilder.setLicenseUri(dataUri);
+                    }
+                }
+                // Strategy 3: Direct keyId + key hex values
+                else if (keyId != null && !keyId.isEmpty() && key != null && !key.isEmpty()) {
                     keyId = keyId.replaceAll("[^a-fA-F0-9]", "");
                     key = key.replaceAll("[^a-fA-F0-9]", "");
                     
-                    if (keyId.length() >= 32 && key.length() >= 32) {
-                        // Truncate to 32 characters (16 bytes) if longer
-                        keyId = keyId.substring(0, 32);
-                        key = key.substring(0, 32);
-                    }
+                    if (keyId.length() >= 32) keyId = keyId.substring(0, 32);
+                    if (key.length() >= 32) key = key.substring(0, 32);
                     
                     String clearKeyJson = buildClearKeyJson(keyId, key);
                     String dataUri = "data:application/json;base64," + 
                         Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
                     drmBuilder.setLicenseUri(dataUri);
-                    Log.d(TAG, "ClearKey configured with keyId:key - keyId length: " + keyId.length() + ", key length: " + key.length());
-                } else if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
-                    drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
-                    Log.d(TAG, "ClearKey configured with license URL");
+                    Log.d(TAG, "ClearKey: Built from keyId+key");
+                }
+                // Strategy 4: Combined "keyId:key" in keyId field
+                else if (keyId != null && keyId.contains(":") && !keyId.contains("http")) {
+                    String[] parts = keyId.split(":");
+                    if (parts.length >= 2) {
+                        String kid = parts[0].replaceAll("[^a-fA-F0-9]", "");
+                        String k = parts[1].replaceAll("[^a-fA-F0-9]", "");
+                        if (kid.length() >= 32) kid = kid.substring(0, 32);
+                        if (k.length() >= 32) k = k.substring(0, 32);
+                        String clearKeyJson = buildClearKeyJson(kid, k);
+                        String dataUri = "data:application/json;base64," + 
+                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
+                        drmBuilder.setLicenseUri(dataUri);
+                        Log.d(TAG, "ClearKey: Built from combined format");
+                    }
+                }
+                // Strategy 5: License URL with keyid/key params (like vercel API)
+                else if (licenseUrl != null && !licenseUrl.isEmpty()) {
+                    Log.d(TAG, "ClearKey: Fetching from license URL: " + licenseUrl);
+                    String clearKeyJson = fetchClearKeyFromApi(licenseUrl);
+                    if (clearKeyJson != null) {
+                        String dataUri = "data:application/json;base64," + 
+                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
+                        drmBuilder.setLicenseUri(dataUri);
+                    } else {
+                        drmBuilder.setLicenseUri(licenseUrl);
+                    }
                 }
             }
             
@@ -774,16 +803,15 @@ public class PlayerActivity extends AppCompatActivity {
         
         MediaItem mediaItem = mediaItemBuilder.build();
         
-        // Detect format - improved detection for complex URLs
-        String lowerUrl = url.toLowerCase();
-        String pathOnly = url.contains("?") ? url.substring(0, url.indexOf("?")).toLowerCase() : lowerUrl;
+        // Detect format - smart detection for complex URLs with tokens/params
+        String format = detectStreamFormat(url);
         
-        if (pathOnly.endsWith(".m3u8") || lowerUrl.contains("/hls/") || lowerUrl.contains("format=m3u8")) {
+        if ("hls".equals(format)) {
             Log.d(TAG, "Building HLS source");
             return new HlsMediaSource.Factory(dataSourceFactory)
                 .setAllowChunklessPreparation(true)
                 .createMediaSource(mediaItem);
-        } else if (pathOnly.endsWith(".mpd") || lowerUrl.contains("/dash/") || lowerUrl.contains("format=mpd")) {
+        } else if ("dash".equals(format)) {
             Log.d(TAG, "Building DASH source");
             return new DashMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);
@@ -792,6 +820,130 @@ public class PlayerActivity extends AppCompatActivity {
             return new ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem);
         }
+    }
+    
+    /**
+     * Smart stream format detection that handles complex URLs with tokens,
+     * query parameters, fragments, and CDN paths
+     */
+    private String detectStreamFormat(String url) {
+        if (url == null || url.isEmpty()) return "progressive";
+        
+        String lower = url.toLowerCase();
+        
+        // 1. Check path extension (before query string and fragment)
+        try {
+            Uri uri = Uri.parse(url);
+            String path = uri.getPath();
+            if (path != null) {
+                path = path.toLowerCase();
+                if (path.endsWith(".m3u8")) return "hls";
+                if (path.endsWith(".mpd")) return "dash";
+                if (path.endsWith(".mp4") || path.endsWith(".mkv") || 
+                    path.endsWith(".webm") || path.endsWith(".ts")) return "progressive";
+            }
+        } catch (Exception ignored) {}
+        
+        // 2. Check URL keywords anywhere (including query params)
+        if (lower.contains(".m3u8") || lower.contains("/hls/") || 
+            lower.contains("format=m3u8") || lower.contains("type=hls")) return "hls";
+        if (lower.contains(".mpd") || lower.contains("/dash/") || 
+            lower.contains("format=mpd") || lower.contains("type=dash") ||
+            lower.contains("manifest(format=mpd") || lower.contains("output=mpd")) return "dash";
+        
+        // 3. Check content-type hints in URL
+        if (lower.contains("application/x-mpegurl") || lower.contains("vnd.apple.mpegurl")) return "hls";
+        if (lower.contains("application/dash+xml")) return "dash";
+        
+        return "progressive";
+    }
+    
+    /**
+     * Fetch ClearKey JSON from an API endpoint
+     * Supports responses in standard ClearKey format or custom formats
+     */
+    private String fetchClearKeyFromApi(String apiUrl) {
+        try {
+            Log.d(TAG, "Fetching ClearKey from: " + apiUrl);
+            java.net.URL url = new java.net.URL(apiUrl);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            
+            int responseCode = conn.getResponseCode();
+            Log.d(TAG, "ClearKey API response code: " + responseCode);
+            
+            if (responseCode == 200) {
+                java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+                
+                String body = response.toString().trim();
+                Log.d(TAG, "ClearKey API response: " + body);
+                
+                // Check if it's already a valid ClearKey JSON (has "keys" array)
+                if (body.contains("\"keys\"") && body.contains("\"kty\"")) {
+                    return body;
+                }
+                
+                // Try to parse as JSON with keyId/key fields
+                try {
+                    com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+                    
+                    String keyId = null;
+                    String key = null;
+                    
+                    // Try various field names
+                    String[] keyIdNames = {"keyid", "keyId", "key_id", "kid", "KID"};
+                    String[] keyNames = {"key", "Key", "KEY", "k"};
+                    
+                    for (String name : keyIdNames) {
+                        if (json.has(name) && !json.get(name).isJsonNull()) {
+                            keyId = json.get(name).getAsString();
+                            break;
+                        }
+                    }
+                    for (String name : keyNames) {
+                        if (json.has(name) && !json.get(name).isJsonNull() && !name.equals("kid")) {
+                            key = json.get(name).getAsString();
+                            break;
+                        }
+                    }
+                    
+                    if (keyId != null && key != null) {
+                        keyId = keyId.replaceAll("[^a-fA-F0-9]", "");
+                        key = key.replaceAll("[^a-fA-F0-9]", "");
+                        Log.d(TAG, "Parsed API response - keyId: " + keyId.length() + " chars, key: " + key.length() + " chars");
+                        return buildClearKeyJson(keyId, key);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "ClearKey API response not JSON: " + e.getMessage());
+                }
+                
+                // Try to parse as "keyId:key" plain text
+                if (body.contains(":") && !body.contains("{")) {
+                    String[] parts = body.split(":");
+                    if (parts.length == 2) {
+                        String kid = parts[0].replaceAll("[^a-fA-F0-9]", "");
+                        String k = parts[1].replaceAll("[^a-fA-F0-9]", "");
+                        if (kid.length() >= 16 && k.length() >= 16) {
+                            return buildClearKeyJson(kid, k);
+                        }
+                    }
+                }
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to fetch ClearKey from API: " + e.getMessage());
+        }
+        return null;
     }
 
     private String buildClearKeyJson(String keyId, String key) {
