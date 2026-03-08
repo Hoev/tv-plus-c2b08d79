@@ -119,13 +119,14 @@ public class SecurityMonitor {
         if (detectSniffers()) return "تم اكتشاف برنامج مراقبة";
         if (detectCloudPhone()) return "لا يمكن تشغيل التطبيق على هاتف سحابي";
         if (detectSecondaryDisplay()) return "لا يمكن تشغيل التطبيق على شاشة ثانوية";
-        if (detectEmulator()) return "لا يمكن تشغيل التطبيق على محاكي";
+        // Emulator & Root allowed
+        // if (detectEmulator()) return "لا يمكن تشغيل التطبيق على محاكي";
         if (detectProxy()) return "تم اكتشاف بروكسي";
         if (detectDebugger()) return "تم اكتشاف مصحح أخطاء";
         if (detectSignatureTampering()) return "تم التلاعب بالتطبيق";
         if (detectApkTampering()) return "تم تعديل ملفات التطبيق";
         if (detectFrida()) return "تم اكتشاف أداة اختراق";
-        if (detectRootFiles()) return "الجهاز مروت";
+        // if (detectRootFiles()) return "الجهاز مروت";
         return null; // All checks passed
     }
 
