@@ -468,8 +468,10 @@ const SideMenuManager: React.FC = () => {
                   <WebConfigForm
                     streamConfig={channelForm.stream}
                     playerType={channelForm.preferredPlayer}
+                    iosPlayerApp={channelForm.iosPlayerApp}
                     onStreamChange={(stream) => setChannelForm(prev => ({ ...prev, stream }))}
                     onPlayerTypeChange={(playerType) => setChannelForm(prev => ({ ...prev, preferredPlayer: playerType }))}
+                    onIosPlayerAppChange={(app) => setChannelForm(prev => ({ ...prev, iosPlayerApp: app }))}
                   />
                 </TabsContent>
                 

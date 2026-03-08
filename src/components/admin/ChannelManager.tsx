@@ -444,8 +444,10 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                     <WebConfigForm
                       streamConfig={formData.stream || { url: '' }}
                       playerType={formData.preferredPlayer || 'default'}
+                      iosPlayerApp={formData.iosPlayerApp}
                       onStreamChange={(stream) => setFormData(prev => ({ ...prev, stream }))}
                       onPlayerTypeChange={(playerType) => setFormData(prev => ({ ...prev, preferredPlayer: playerType }))}
+                      onIosPlayerAppChange={(app) => setFormData(prev => ({ ...prev, iosPlayerApp: app }))}
                     />
                   </TabsContent>
                   
