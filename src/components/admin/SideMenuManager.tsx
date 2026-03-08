@@ -135,6 +135,7 @@ const SideMenuManager: React.FC = () => {
       sortOrder: channel.sortOrder,
       stream: channel.stream || { url: '' },
       preferredPlayer: channel.preferredPlayer || 'default',
+      iosPlayerApp: channel.iosPlayerApp,
       androidStream: channel.androidStream || {},
       androidActionType: channel.androidActionType || 'native'
     });
