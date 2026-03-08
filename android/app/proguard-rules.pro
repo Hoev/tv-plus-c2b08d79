@@ -28,28 +28,35 @@
 -keepattributes Signature
 -keepattributes *Annotation*
 
-# Keep our model classes
+# Keep Firebase
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+
+# Keep our model classes (needed for Firebase deserialization)
 -keep class com.apix.app.StreamConfig { *; }
 -keep class com.apix.app.StreamConfig$* { *; }
+-keep class com.apix.app.FirebaseModels { *; }
+-keep class com.apix.app.FirebaseModels$* { *; }
 
-# Keep security monitor (obfuscate internals but keep entry points)
+# Keep security monitor entry points
 -keep class com.apix.app.SecurityMonitor {
     public static ** getInstance(android.content.Context);
     public void startMonitor();
     public void stopMonitor();
+    public java.lang.String runInitialCheck();
+    public void runInitialCheckAsync(**);
 }
 
 # Keep activities
+-keep class com.apix.app.SplashActivity { *; }
+-keep class com.apix.app.HomeActivity { *; }
+-keep class com.apix.app.SubMenuActivity { *; }
 -keep class com.apix.app.MainActivity { *; }
 -keep class com.apix.app.PlayerActivity { *; }
 -keep class com.apix.app.WebViewActivity { *; }
 
-# ===== STRING ENCRYPTION HELPERS =====
-# Obfuscate string constants used in security checks
--adaptresourcefilecontents
--adaptresourcefilenames
-
 # ===== ANTI-DECOMPILATION =====
-# Remove source file names and line numbers
 -renamesourcefileattribute ''
 -keepattributes !SourceFile,!LineNumberTable
+-adaptresourcefilecontents
+-adaptresourcefilenames

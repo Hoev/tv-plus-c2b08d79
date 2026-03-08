@@ -1,45 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="6dp"
     android:focusable="true"
-    android:clickable="true"
-    android:foreground="?android:attr/selectableItemBackground">
+    android:clickable="true">
 
     <androidx.cardview.widget.CardView
-        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardCornerRadius="12dp"
         app:cardElevation="4dp"
         app:cardBackgroundColor="#1A1A1A">
 
-        <!-- Aspect ratio container 16:9 -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:paddingTop="0dp">
+            android:layout_height="wrap_content">
 
-            <!-- Using weight trick for aspect ratio -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <!-- Image with 16:9 aspect ratio -->
-                <ImageView
-                    android:id="@+id/channel_image"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:scaleType="centerCrop"
-                    android:adjustViewBounds="true"
-                    android:contentDescription="Channel" />
-
-            </LinearLayout>
-
-            <!-- Simpler approach: fixed height will be set programmatically -->
+            <!-- Channel image -->
             <ImageView
                 android:id="@+id/channel_image"
                 android:layout_width="match_parent"
@@ -56,7 +35,7 @@
                 android:layout_gravity="bottom"
                 android:background="@drawable/gradient_bottom" />
 
-            <!-- Channel name at bottom -->
+            <!-- Channel name -->
             <TextView
                 android:id="@+id/channel_name"
                 android:layout_width="match_parent"
