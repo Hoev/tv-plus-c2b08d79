@@ -107,6 +107,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       sideMenuId: channel.sideMenuId || '',
       externalUrl: channel.externalUrl || '',
       preferredPlayer: channel.preferredPlayer || 'default',
+      iosPlayerApp: channel.iosPlayerApp,
       androidStream: channel.androidStream || { url: '' },
       androidActionType: channel.androidActionType || 'native'
     });
@@ -156,6 +157,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       // Web settings
       channelData.stream = formData.stream || { url: '' };
       channelData.preferredPlayer = formData.preferredPlayer || 'default';
+      if (formData.iosPlayerApp) channelData.iosPlayerApp = formData.iosPlayerApp;
       
       // Android settings
       channelData.androidStream = formData.androidStream || { url: '' };
@@ -444,8 +446,10 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
                     <WebConfigForm
                       streamConfig={formData.stream || { url: '' }}
                       playerType={formData.preferredPlayer || 'default'}
+                      iosPlayerApp={formData.iosPlayerApp}
                       onStreamChange={(stream) => setFormData(prev => ({ ...prev, stream }))}
                       onPlayerTypeChange={(playerType) => setFormData(prev => ({ ...prev, preferredPlayer: playerType }))}
+                      onIosPlayerAppChange={(app) => setFormData(prev => ({ ...prev, iosPlayerApp: app }))}
                     />
                   </TabsContent>
                   

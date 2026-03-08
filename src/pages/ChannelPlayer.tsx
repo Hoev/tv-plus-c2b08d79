@@ -117,7 +117,7 @@ const ChannelPlayer: React.FC = () => {
     const headersStr = Object.keys(headers).length ? JSON.stringify(headers) : undefined;
 
     if ((window as any).openProPlayer) {
-      (window as any).openProPlayer(stream.url, item.name, drm, headersStr, (item as any).preferredPlayer);
+      (window as any).openProPlayer(stream.url, item.name, drm, headersStr, (item as any).preferredPlayer, (item as any).iosPlayerApp);
       setPlayerOpened(true);
     }
   }, []);

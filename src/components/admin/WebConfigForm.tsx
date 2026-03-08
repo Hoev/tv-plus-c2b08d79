@@ -1,22 +1,26 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Globe, Play, Monitor } from 'lucide-react';
+import { Globe, Play, Monitor, Shield, Smartphone } from 'lucide-react';
 import PlayerConfigForm from './PlayerConfigForm';
-import type { StreamConfig, WebPlayerType } from '@/types/admin';
+import type { StreamConfig, WebPlayerType, iOSPlayerApp } from '@/types/admin';
 
 interface WebConfigFormProps {
   streamConfig: StreamConfig;
   playerType: WebPlayerType;
+  iosPlayerApp?: iOSPlayerApp;
   onStreamChange: (config: StreamConfig) => void;
   onPlayerTypeChange: (playerType: WebPlayerType) => void;
+  onIosPlayerAppChange?: (app: iOSPlayerApp) => void;
 }
 
 const WebConfigForm: React.FC<WebConfigFormProps> = ({
   streamConfig,
   playerType,
+  iosPlayerApp,
   onStreamChange,
-  onPlayerTypeChange
+  onPlayerTypeChange,
+  onIosPlayerAppChange,
 }) => {
   return (
     <div className="space-y-4 p-4 rounded-lg border-2 border-blue-600/30 bg-blue-950/20">
@@ -54,12 +58,70 @@ const WebConfigForm: React.FC<WebConfigFormProps> = ({
                 <span>Web/Iframe (تضمين مباشر)</span>
               </div>
             </SelectItem>
+            <SelectItem value="secure">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-amber-500" />
+                <span>المشغل الآمن (Secure Player)</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="external_ios">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-cyan-500" />
+                <span>مشغل خارجي iOS</span>
+              </div>
+            </SelectItem>
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          المستخدم لن يرى خيار التبديل بين المشغلات
+          {playerType === 'secure' && '🔒 يمنع استخراج رابط البث - يستخدم HLS.js مع Blob URLs'}
+          {playerType === 'external_ios' && '📱 يفتح البث في تطبيق خارجي على iPhone/iPad'}
+          {playerType !== 'secure' && playerType !== 'external_ios' && 'المستخدم لن يرى خيار التبديل بين المشغلات'}
         </p>
       </div>
+
+      {/* iOS Player App Selection - only show when external_ios is selected */}
+      {playerType === 'external_ios' && (
+        <div className="space-y-2 p-3 rounded-lg border border-cyan-600/30 bg-cyan-950/20">
+          <Label className="text-cyan-400">تطبيق iOS المشغل</Label>
+          <Select
+            value={iosPlayerApp || 'vlc'}
+            onValueChange={(value: iOSPlayerApp) => onIosPlayerAppChange?.(value)}
+          >
+            <SelectTrigger className="bg-secondary border-border">
+              <SelectValue placeholder="اختر التطبيق" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border z-50">
+              <SelectItem value="vlc">
+                <div className="flex items-center gap-2">
+                  <span>🎬</span>
+                  <span>VLC (مجاني)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="nplayer">
+                <div className="flex items-center gap-2">
+                  <span>▶️</span>
+                  <span>nPlayer (مدفوع)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="infuse">
+                <div className="flex items-center gap-2">
+                  <span>🎥</span>
+                  <span>Infuse (مجاني + مدفوع)</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="outplayer">
+                <div className="flex items-center gap-2">
+                  <span>📺</span>
+                  <span>Outplayer (مجاني)</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            إذا لم يكن التطبيق مثبتاً سيُعرض رابط تحميله + خيار التشغيل في المتصفح
+          </p>
+        </div>
+      )}
 
       {/* Stream Configuration */}
       <PlayerConfigForm

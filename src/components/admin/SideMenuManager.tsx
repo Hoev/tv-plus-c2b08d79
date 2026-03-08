@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update, remove, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { SideMenu, SubChannel, StreamConfig, AndroidStreamConfig, AndroidActionType } from '@/types/admin';
-import type { WebPlayerType } from '@/types/admin';
+import type { WebPlayerType, iOSPlayerApp } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,7 @@ const SideMenuManager: React.FC = () => {
     // Web settings
     stream: StreamConfig;
     preferredPlayer: WebPlayerType;
+    iosPlayerApp?: iOSPlayerApp;
     // Android settings
     androidStream: Partial<AndroidStreamConfig>;
     androidActionType: AndroidActionType;
@@ -134,6 +135,7 @@ const SideMenuManager: React.FC = () => {
       sortOrder: channel.sortOrder,
       stream: channel.stream || { url: '' },
       preferredPlayer: channel.preferredPlayer || 'default',
+      iosPlayerApp: channel.iosPlayerApp,
       androidStream: channel.androidStream || {},
       androidActionType: channel.androidActionType || 'native'
     });
@@ -150,6 +152,7 @@ const SideMenuManager: React.FC = () => {
       // Web settings
       stream: channelForm.stream,
       preferredPlayer: channelForm.preferredPlayer || 'default',
+      ...(channelForm.iosPlayerApp ? { iosPlayerApp: channelForm.iosPlayerApp } : {}),
       // Android settings
       androidStream: channelForm.androidStream as AndroidStreamConfig,
       androidActionType: channelForm.androidActionType || 'native'
@@ -468,8 +471,10 @@ const SideMenuManager: React.FC = () => {
                   <WebConfigForm
                     streamConfig={channelForm.stream}
                     playerType={channelForm.preferredPlayer}
+                    iosPlayerApp={channelForm.iosPlayerApp}
                     onStreamChange={(stream) => setChannelForm(prev => ({ ...prev, stream }))}
                     onPlayerTypeChange={(playerType) => setChannelForm(prev => ({ ...prev, preferredPlayer: playerType }))}
+                    onIosPlayerAppChange={(app) => setChannelForm(prev => ({ ...prev, iosPlayerApp: app }))}
                   />
                 </TabsContent>
                 
