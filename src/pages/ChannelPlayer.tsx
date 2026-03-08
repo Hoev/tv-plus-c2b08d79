@@ -273,8 +273,8 @@ const ChannelPlayer: React.FC = () => {
               background: 'linear-gradient(to top, rgba(0,0,0,0.95), transparent)', zIndex: 2,
             }} />
             <div style={{ position: 'relative', zIndex: 3, padding: '8px 12px', textAlign: 'right', width: '100%' }}>
-              <span style={{
-                color: '#fff', fontSize: 16, fontWeight: 700,
+              <span className="subchannel-title" style={{
+                color: '#fff', fontWeight: 700,
                 textShadow: '0 2px 4px rgba(0,0,0,0.9)',
                 display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
