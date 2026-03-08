@@ -157,6 +157,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ category }) => {
       // Web settings
       channelData.stream = formData.stream || { url: '' };
       channelData.preferredPlayer = formData.preferredPlayer || 'default';
+      if (formData.iosPlayerApp) channelData.iosPlayerApp = formData.iosPlayerApp;
       
       // Android settings
       channelData.androidStream = formData.androidStream || { url: '' };
