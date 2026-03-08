@@ -1,7 +1,15 @@
 export type ActionType = 'direct_play' | 'open_submenu' | 'external_link';
 
 // Web-specific player types
-export type WebPlayerType = 'default' | 'custom' | 'iframe';
+export type WebPlayerType = 'default' | 'custom' | 'iframe' | 'secure' | 'external_ios';
+
+// iOS external player apps
+export type iOSPlayerApp = 'vlc' | 'nplayer' | 'infuse' | 'outplayer';
+
+export interface iOSPlayerConfig {
+  app: iOSPlayerApp;
+  fallbackToWeb?: boolean; // If app not installed, play in secure player
+}
 
 // Android-specific action types
 export type AndroidActionType = 'native' | 'webview' | 'intent';
