@@ -151,6 +151,7 @@ const SideMenuManager: React.FC = () => {
       // Web settings
       stream: channelForm.stream,
       preferredPlayer: channelForm.preferredPlayer || 'default',
+      ...(channelForm.iosPlayerApp ? { iosPlayerApp: channelForm.iosPlayerApp } : {}),
       // Android settings
       androidStream: channelForm.androidStream as AndroidStreamConfig,
       androidActionType: channelForm.androidActionType || 'native'
