@@ -152,8 +152,9 @@ public class SecurityMonitor {
                     if (detectSniffers()) { killApp(); return; }
                     if (detectCloudPhone()) { killApp(); return; }
                     if (detectSecondaryDisplay()) { killApp(); return; }
+                    // Emulator & Root allowed
+                    // if (detectEmulator()) { killApp(); return; }
                     if (detectProxy()) { killApp(); return; }
-                    if (detectEmulator()) { killApp(); return; }
                     if (detectHostsModification()) { killApp(); return; }
                     if (detectUnauthorizedVPN()) { killApp(); return; }
                     if (detectSignatureTampering()) { killApp(); return; }
@@ -161,7 +162,7 @@ public class SecurityMonitor {
                     if (detectDebugger()) { killApp(); return; }
                     if (detectFrida()) { killApp(); return; }
                     if (detectApkTampering()) { killApp(); return; }
-                    if (detectRootFiles()) { killApp(); return; }
+                    // if (detectRootFiles()) { killApp(); return; }
                     
                     Thread.sleep(5 + (long)(Math.random() * 14));
                 } catch (InterruptedException e) {
