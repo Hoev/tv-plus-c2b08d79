@@ -763,13 +763,16 @@ public class PlayerActivity extends AppCompatActivity {
         return factory;
     }
 
-    private MediaSource buildMediaSource(DataSource.Factory dataSourceFactory) {
+    /**
+     * Build MediaSource with optional pre-resolved ClearKey JSON
+     * @param resolvedClearKeyJson pre-fetched ClearKey JSON (from background thread), or null
+     */
+    private MediaSource buildMediaSource(DataSource.Factory dataSourceFactory, String resolvedClearKeyJson) {
         String url = streamConfig.url;
         Log.d(TAG, "Building media source for: " + url);
         
         Uri uri = Uri.parse(url);
         
-        // Build MediaItem with DRM configuration
         MediaItem.Builder mediaItemBuilder = new MediaItem.Builder().setUri(uri);
         
         if (streamConfig.hasDrm() && streamConfig.drm != null) {
@@ -785,7 +788,6 @@ public class PlayerActivity extends AppCompatActivity {
                 
                 if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
-                    Log.d(TAG, "Widevine License URL: " + streamConfig.drm.licenseUrl);
                 }
                 
                 if (streamConfig.hasHeaders()) {
@@ -810,82 +812,18 @@ public class PlayerActivity extends AppCompatActivity {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                 }
             } else {
-                // ClearKey
+                // ClearKey - use pre-resolved JSON from background thread
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID);
                 
-                String keyId = streamConfig.drm.keyId;
-                String key = streamConfig.drm.key;
-                String licenseUrl = streamConfig.drm.licenseUrl;
-                
-                // Strategy 1: License URL that returns ClearKey JSON (API endpoint)
-                if (licenseUrl != null && !licenseUrl.isEmpty() && 
-                    licenseUrl.startsWith("http") && (keyId == null || keyId.isEmpty())) {
-                    // Fetch key from API and build ClearKey JSON
-                    Log.d(TAG, "ClearKey: Using license API URL: " + licenseUrl);
-                    String clearKeyJson = fetchClearKeyFromApi(licenseUrl);
-                    if (clearKeyJson != null) {
-                        String dataUri = "data:application/json;base64," + 
-                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
-                        drmBuilder.setLicenseUri(dataUri);
-                        Log.d(TAG, "ClearKey: Built from API response");
-                    } else {
-                        // Fallback: pass URL directly, ExoPlayer may handle it
-                        drmBuilder.setLicenseUri(licenseUrl);
-                        Log.d(TAG, "ClearKey: Passing license URL directly");
-                    }
-                }
-                // Strategy 2: keyId contains a URL (combined format like "keyid:https://...")
-                else if (keyId != null && keyId.contains("http")) {
-                    String apiUrl = keyId.contains(":http") ? 
-                        keyId.substring(keyId.indexOf("http")) : keyId;
-                    Log.d(TAG, "ClearKey: Extracted API URL from keyId: " + apiUrl);
-                    String clearKeyJson = fetchClearKeyFromApi(apiUrl);
-                    if (clearKeyJson != null) {
-                        String dataUri = "data:application/json;base64," + 
-                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
-                        drmBuilder.setLicenseUri(dataUri);
-                    }
-                }
-                // Strategy 3: Direct keyId + key hex values
-                else if (keyId != null && !keyId.isEmpty() && key != null && !key.isEmpty()) {
-                    keyId = keyId.replaceAll("[^a-fA-F0-9]", "");
-                    key = key.replaceAll("[^a-fA-F0-9]", "");
-                    
-                    if (keyId.length() >= 32) keyId = keyId.substring(0, 32);
-                    if (key.length() >= 32) key = key.substring(0, 32);
-                    
-                    String clearKeyJson = buildClearKeyJson(keyId, key);
+                if (resolvedClearKeyJson != null) {
                     String dataUri = "data:application/json;base64," + 
-                        Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
+                        Base64.encodeToString(resolvedClearKeyJson.getBytes(), Base64.NO_WRAP);
                     drmBuilder.setLicenseUri(dataUri);
-                    Log.d(TAG, "ClearKey: Built from keyId+key");
-                }
-                // Strategy 4: Combined "keyId:key" in keyId field
-                else if (keyId != null && keyId.contains(":") && !keyId.contains("http")) {
-                    String[] parts = keyId.split(":");
-                    if (parts.length >= 2) {
-                        String kid = parts[0].replaceAll("[^a-fA-F0-9]", "");
-                        String k = parts[1].replaceAll("[^a-fA-F0-9]", "");
-                        if (kid.length() >= 32) kid = kid.substring(0, 32);
-                        if (k.length() >= 32) k = k.substring(0, 32);
-                        String clearKeyJson = buildClearKeyJson(kid, k);
-                        String dataUri = "data:application/json;base64," + 
-                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
-                        drmBuilder.setLicenseUri(dataUri);
-                        Log.d(TAG, "ClearKey: Built from combined format");
-                    }
-                }
-                // Strategy 5: License URL with keyid/key params (like vercel API)
-                else if (licenseUrl != null && !licenseUrl.isEmpty()) {
-                    Log.d(TAG, "ClearKey: Fetching from license URL: " + licenseUrl);
-                    String clearKeyJson = fetchClearKeyFromApi(licenseUrl);
-                    if (clearKeyJson != null) {
-                        String dataUri = "data:application/json;base64," + 
-                            Base64.encodeToString(clearKeyJson.getBytes(), Base64.NO_WRAP);
-                        drmBuilder.setLicenseUri(dataUri);
-                    } else {
-                        drmBuilder.setLicenseUri(licenseUrl);
-                    }
+                    Log.d(TAG, "ClearKey: Applied pre-resolved JSON");
+                } else if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
+                    // Fallback: pass license URL directly
+                    drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
+                    Log.d(TAG, "ClearKey: Passing license URL directly as fallback");
                 }
             }
             
@@ -894,7 +832,7 @@ public class PlayerActivity extends AppCompatActivity {
         
         MediaItem mediaItem = mediaItemBuilder.build();
         
-        // Detect format - smart detection for complex URLs with tokens/params
+        // Detect format
         String format = detectStreamFormat(url);
         
         if ("hls".equals(format)) {
