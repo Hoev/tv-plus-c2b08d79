@@ -21,12 +21,10 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
-
-        <!-- Main Activity (WebView) -->
+        <!-- Splash Activity (Entry Point - Security Check) -->
         <activity
-            android:name=".MainActivity"
+            android:name=".SplashActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.TVPlus.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -34,6 +32,20 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Home Activity (Native UI) -->
+        <activity
+            android:name=".HomeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.TVPlus.NoActionBar" />
+
+        <!-- Sub Menu Activity -->
+        <activity
+            android:name=".SubMenuActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.TVPlus.NoActionBar" />
 
         <!-- Player Activity (Full Screen Landscape) -->
         <activity
@@ -50,6 +62,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.TVPlus.NoActionBar" />
 
+        <!-- Old MainActivity kept for backward compatibility but not launched -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TVPlus.NoActionBar" />
 
     </application>
 
