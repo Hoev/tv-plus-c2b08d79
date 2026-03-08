@@ -873,14 +873,22 @@ public class PlayerActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {}
         
-        // 2. Check URL keywords anywhere (including query params)
-        if (lower.contains(".m3u8") || lower.contains("/hls/") || 
+        // 2. Check for format extensions anywhere in URL (handles complex query params)
+        // Match .mpd or .m3u8 followed by ? or end or other non-alpha char
+        if (lower.matches(".*\\.m3u8([?#&,;].*)?$") || lower.contains(".m3u8?") || 
+            lower.contains(".m3u8&") || lower.contains("/hls/") || 
             lower.contains("format=m3u8") || lower.contains("type=hls")) return "hls";
-        if (lower.contains(".mpd") || lower.contains("/dash/") || 
+        if (lower.matches(".*\\.mpd([?#&,;].*)?$") || lower.contains(".mpd?") || 
+            lower.contains(".mpd&") || lower.contains("/dash/") || 
             lower.contains("format=mpd") || lower.contains("type=dash") ||
-            lower.contains("manifest(format=mpd") || lower.contains("output=mpd")) return "dash";
+            lower.contains("manifest(format=mpd") || lower.contains("output=mpd") ||
+            lower.contains("/pltv/")) return "dash";
         
-        // 3. Check content-type hints in URL
+        // 3. Broad keyword check
+        if (lower.contains(".m3u8")) return "hls";
+        if (lower.contains(".mpd")) return "dash";
+        
+        // 4. Content-type hints
         if (lower.contains("application/x-mpegurl") || lower.contains("vnd.apple.mpegurl")) return "hls";
         if (lower.contains("application/dash+xml")) return "dash";
         
