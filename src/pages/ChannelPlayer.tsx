@@ -296,15 +296,17 @@ const ChannelPlayer: React.FC = () => {
           to { opacity: 1; transform: translateY(0); }
         }
         .subchannel-grid {
-          grid-template-columns: repeat(2, 1fr);
-          max-width: 1100px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          width: 100%;
+          max-width: none;
           gap: 15px;
         }
         @media (orientation: landscape) {
           .subchannel-grid {
-            grid-template-columns: repeat(4, 1fr) !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             gap: 20px !important;
-            max-width: 1100px !important;
+            max-width: none !important;
+            width: 100% !important;
           }
         }
         .subchannel-card {
