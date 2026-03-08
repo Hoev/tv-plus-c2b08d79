@@ -6,12 +6,13 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
+import android.hardware.display.DisplayManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Debug;
-import android.util.Log;
+import android.view.Display;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,39 +29,27 @@ import java.util.zip.ZipFile;
  * Security Monitor - Advanced Anti-Tamper & Anti-Reverse-Engineering System
  * 
  * Features:
- * - Continuous background monitoring (every 5-19ms)
- * - Sniffer/Proxy detection
- * - Emulator/VM detection
- * - VPN detection with IP whitelist
- * - Hosts file modification detection
- * - HARDCODED signature verification (anti-repack)
- * - Private DNS ad-blocker detection
- * - Debugger detection
- * - Root/Frida/Xposed detection
- * - APK integrity verification (classes.dex checksum)
- * - Installer verification (only Play Store / manual install)
+ * - 3-second splash security check before app loads
+ * - Continuous background monitoring (5-19ms)
+ * - Cloud phone / virtual device detection
+ * - Secondary display / VMOS detection
+ * - Sniffer/Proxy/Emulator detection
+ * - Debugger/Frida/Root detection
+ * - APK integrity & signature verification
  */
 public class SecurityMonitor {
     
-    private static final String TAG = "SM";
     private static SecurityMonitor instance;
     private Context context;
     private Thread monitorThread;
     private volatile boolean running = false;
     
-    // ========== HARDCODED SIGNATURE HASH ==========
-    // This MUST be updated with your release signing key's SHA-256 hash
-    // To get it: keytool -list -v -keystore your-key.jks | grep SHA256
-    // Or leave null to auto-detect on first run (less secure but functional)
-    private static final String RELEASE_SIGNATURE_HASH = null; // SET THIS FOR PRODUCTION!
-    
-    // Fallback: auto-detected on first run
+    // HARDCODED signature hash - set for production
+    private static final String RELEASE_SIGNATURE_HASH = null;
     private String expectedSignatureHash = null;
-    
-    // DEX file count for integrity check
     private int expectedDexCount = -1;
     
-    // Known sniffer/proxy/hacking packages
+    // Dangerous packages
     private static final String[] DANGEROUS_PACKAGES = {
         // Sniffers
         "com.guoshi.httpcanary", "com.guoshi.httpcanary.premium",
@@ -81,16 +70,32 @@ public class SecurityMonitor {
         "com.ramdroid.appquarantine",
         // Frida
         "re.frida.server", "com.frida",
+        // Cloud phones & virtual environments
+        "com.redfinger.app", "com.redfinger.cloud",
+        "com.nowgg.cloud", "com.netease.mumu",
+        "com.microvirt.memuime", "com.bignox.appcenter",
+        "com.ldmnq.launcher3", "com.ldmnq.launcher",
+        "com.kaopu.gameassistant", "com.excelliance.multiaccount",
+        "com.parallel.space", "com.parallel.space.lite",
+        "com.lbe.parallel.intl", "com.jumobile.smartapp.dual",
     };
     
-    // Known Frida ports
-    private static final int[] FRIDA_PORTS = {27042, 27043};
+    // Cloud phone indicators in build properties
+    private static final String[] CLOUD_PHONE_INDICATORS = {
+        "vmos", "redfinger", "nowgg", "cloudphone", "remotegaming",
+        "cloud_phone", "virtual_phone", "phonecloud", "genymotion",
+        "tencent_cloud", "huawei_cloud", "alicloud", "aws_device_farm",
+    };
     
+    private static final int[] FRIDA_PORTS = {27042, 27043};
     private static final String VPN_WHITELIST_PREFIX = "172.19.0.";
+
+    public interface SecurityCheckCallback {
+        void onCheckComplete(boolean passed, String failReason);
+    }
 
     private SecurityMonitor(Context ctx) {
         this.context = ctx.getApplicationContext();
-        // Use hardcoded hash if available, otherwise auto-detect
         if (RELEASE_SIGNATURE_HASH != null) {
             this.expectedSignatureHash = RELEASE_SIGNATURE_HASH;
         } else {
@@ -106,36 +111,61 @@ public class SecurityMonitor {
         return instance;
     }
     
+    /**
+     * Run initial security check (blocking, used during splash screen)
+     * Returns null if passed, or failure reason string
+     */
+    public String runInitialCheck() {
+        if (detectSniffers()) return "تم اكتشاف برنامج مراقبة";
+        if (detectCloudPhone()) return "لا يمكن تشغيل التطبيق على هاتف سحابي";
+        if (detectSecondaryDisplay()) return "لا يمكن تشغيل التطبيق على شاشة ثانوية";
+        if (detectEmulator()) return "لا يمكن تشغيل التطبيق على محاكي";
+        if (detectProxy()) return "تم اكتشاف بروكسي";
+        if (detectDebugger()) return "تم اكتشاف مصحح أخطاء";
+        if (detectSignatureTampering()) return "تم التلاعب بالتطبيق";
+        if (detectApkTampering()) return "تم تعديل ملفات التطبيق";
+        if (detectFrida()) return "تم اكتشاف أداة اختراق";
+        if (detectRootFiles()) return "الجهاز مروت";
+        return null; // All checks passed
+    }
+
+    /**
+     * Run initial check asynchronously with callback
+     */
+    public void runInitialCheckAsync(SecurityCheckCallback callback) {
+        new Thread(() -> {
+            String result = runInitialCheck();
+            if (callback != null) {
+                callback.onCheckComplete(result == null, result);
+            }
+        }).start();
+    }
+    
     public void startMonitor() {
         if (running) return;
         running = true;
         
         monitorThread = new Thread(() -> {
-            // Initial delay to let app initialize
-            try { Thread.sleep(2000); } catch (InterruptedException e) { return; }
-            
             while (running) {
                 try {
-                    if (detectSniffers()) { killApp("D1"); return; }
-                    if (detectProxy()) { killApp("D2"); return; }
-                    if (detectEmulator()) { killApp("D3"); return; }
-                    if (detectHostsModification()) { killApp("D4"); return; }
-                    if (detectUnauthorizedVPN()) { killApp("D5"); return; }
-                    if (detectSignatureTampering()) { killApp("D6"); return; }
-                    if (detectPrivateDNS()) { killApp("D7"); return; }
-                    if (detectDebugger()) { killApp("D8"); return; }
-                    if (detectFrida()) { killApp("D9"); return; }
-                    if (detectApkTampering()) { killApp("D10"); return; }
-                    if (detectRootFiles()) { killApp("D11"); return; }
+                    if (detectSniffers()) { killApp(); return; }
+                    if (detectCloudPhone()) { killApp(); return; }
+                    if (detectSecondaryDisplay()) { killApp(); return; }
+                    if (detectProxy()) { killApp(); return; }
+                    if (detectEmulator()) { killApp(); return; }
+                    if (detectHostsModification()) { killApp(); return; }
+                    if (detectUnauthorizedVPN()) { killApp(); return; }
+                    if (detectSignatureTampering()) { killApp(); return; }
+                    if (detectPrivateDNS()) { killApp(); return; }
+                    if (detectDebugger()) { killApp(); return; }
+                    if (detectFrida()) { killApp(); return; }
+                    if (detectApkTampering()) { killApp(); return; }
+                    if (detectRootFiles()) { killApp(); return; }
                     
-                    // Random sleep 5-19ms
                     Thread.sleep(5 + (long)(Math.random() * 14));
-                    
                 } catch (InterruptedException e) {
                     break;
-                } catch (Exception e) {
-                    // Silent - don't reveal security checks
-                }
+                } catch (Exception ignored) {}
             }
         }, "t1");
         
@@ -152,7 +182,7 @@ public class SecurityMonitor {
         }
     }
     
-    private void killApp(String code) {
+    private void killApp() {
         running = false;
         try {
             ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
@@ -171,7 +201,96 @@ public class SecurityMonitor {
         System.exit(0);
     }
     
-    // ======== DETECTION MODULES ========
+    // ======== CLOUD PHONE & VIRTUAL ENVIRONMENT DETECTION ========
+    
+    private boolean detectCloudPhone() {
+        String model = Build.MODEL.toLowerCase();
+        String manufacturer = Build.MANUFACTURER.toLowerCase();
+        String brand = Build.BRAND.toLowerCase();
+        String product = Build.PRODUCT.toLowerCase();
+        String device = Build.DEVICE.toLowerCase();
+        String hardware = Build.HARDWARE.toLowerCase();
+        String fingerprint = Build.FINGERPRINT.toLowerCase();
+        String board = Build.BOARD.toLowerCase();
+        
+        // Check all build properties against cloud phone indicators
+        for (String indicator : CLOUD_PHONE_INDICATORS) {
+            if (model.contains(indicator) || manufacturer.contains(indicator) ||
+                brand.contains(indicator) || product.contains(indicator) ||
+                device.contains(indicator) || hardware.contains(indicator) ||
+                fingerprint.contains(indicator) || board.contains(indicator)) {
+                return true;
+            }
+        }
+        
+        // Check for VMOS specifically
+        if (model.contains("vmos") || Build.DISPLAY.toLowerCase().contains("vmos") ||
+            new File("/data/data/com.vmos.pro").exists() ||
+            new File("/data/data/com.vmos.app").exists()) {
+            return true;
+        }
+        
+        // Check for cloud phone files
+        String[] cloudPhoneFiles = {
+            "/data/data/com.redfinger.app",
+            "/data/data/com.redfinger.cloud",
+            "/data/data/com.nowgg.cloud",
+            "/system/app/VMOSFakeGps",
+            "/data/vmos",
+        };
+        for (String path : cloudPhoneFiles) {
+            if (new File(path).exists()) return true;
+        }
+        
+        // Check system properties for cloud indicators
+        try {
+            Process process = Runtime.getRuntime().exec("getprop");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String lower = line.toLowerCase();
+                if (lower.contains("vmos") || lower.contains("cloud.phone") ||
+                    lower.contains("redfinger") || lower.contains("virtual.device")) {
+                    reader.close();
+                    return true;
+                }
+            }
+            reader.close();
+        } catch (Exception ignored) {}
+        
+        return false;
+    }
+    
+    /**
+     * Detect secondary/virtual displays (screen mirroring, dual screen apps)
+     */
+    private boolean detectSecondaryDisplay() {
+        try {
+            DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
+            if (dm != null) {
+                Display[] displays = dm.getDisplays();
+                // More than 1 display and any is not the default = suspicious
+                if (displays.length > 1) {
+                    for (Display display : displays) {
+                        if (display.getDisplayId() != Display.DEFAULT_DISPLAY) {
+                            // Check if it's a presentation display or virtual
+                            int flags = display.getFlags();
+                            boolean isVirtual = (flags & Display.FLAG_PRESENTATION) != 0;
+                            boolean isPrivate = (flags & Display.FLAG_PRIVATE) != 0;
+                            
+                            // Virtual/presentation displays are suspicious
+                            if (isVirtual || isPrivate) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+    
+    // ======== EXISTING DETECTION MODULES ========
     
     private boolean detectSniffers() {
         PackageManager pm = context.getPackageManager();
@@ -187,13 +306,11 @@ public class SecurityMonitor {
     private boolean detectProxy() {
         String proxyHost = System.getProperty("http.proxyHost");
         if (proxyHost != null && !proxyHost.isEmpty()) return true;
-        
         try {
             String globalProxy = android.provider.Settings.Global.getString(
                 context.getContentResolver(), "http_proxy");
             if (globalProxy != null && !globalProxy.isEmpty() && !globalProxy.equals(":0")) return true;
         } catch (Exception ignored) {}
-        
         return false;
     }
     
@@ -207,16 +324,16 @@ public class SecurityMonitor {
         
         if (model.contains("vmos") || manufacturer.contains("vmos") || 
             product.contains("vmos") || brand.contains("vmos")) return true;
-        
         if (fingerprint.contains("generic") || fingerprint.contains("unknown") ||
             fingerprint.contains("sdk") || fingerprint.contains("emulator") ||
             fingerprint.contains("vbox")) {
             if (model.contains("sdk") || model.contains("emulator") || 
                 model.contains("android sdk") || device.contains("generic")) return true;
         }
-        
         if (model.contains("bluestacks") || manufacturer.contains("bluestacks")) return true;
         if (model.contains("nox") || manufacturer.contains("nox") || brand.contains("nox")) return true;
+        if (model.contains("memu") || manufacturer.contains("microvirt")) return true;
+        if (model.contains("ldplayer") || manufacturer.contains("ldmnq")) return true;
         
         File qemuFile = new File("/dev/qemu_pipe");
         File goldfish = new File("/sys/qemu_trace");
@@ -237,7 +354,6 @@ public class SecurityMonitor {
         try {
             ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             if (cm == null) return false;
-            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 Network activeNetwork = cm.getActiveNetwork();
                 if (activeNetwork != null) {
@@ -274,14 +390,10 @@ public class SecurityMonitor {
         return false;
     }
     
-    /**
-     * HARDCODED signature check - prevents repackaging
-     * Even if someone decompiles, they can't sign with the original key
-     */
     private boolean detectSignatureTampering() {
         if (expectedSignatureHash == null) return false;
         String currentHash = getCurrentSignatureHash();
-        if (currentHash == null) return true; // Can't verify = suspicious
+        if (currentHash == null) return true;
         return !expectedSignatureHash.equals(currentHash);
     }
     
@@ -337,22 +449,12 @@ public class SecurityMonitor {
         return false;
     }
     
-    // ======== NEW SECURITY MODULES ========
-    
-    /**
-     * Detect if a debugger is attached
-     */
     private boolean detectDebugger() {
-        // Check Java debugger
         if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) return true;
-        
-        // Check if app is debuggable (should NOT be in release)
         try {
             ApplicationInfo appInfo = context.getApplicationInfo();
             if ((appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) return true;
         } catch (Exception ignored) {}
-        
-        // Check TracerPid in /proc/self/status
         try {
             BufferedReader reader = new BufferedReader(
                 new InputStreamReader(Runtime.getRuntime().exec("cat /proc/self/status").getInputStream()));
@@ -365,24 +467,17 @@ public class SecurityMonitor {
             }
             reader.close();
         } catch (Exception ignored) {}
-        
         return false;
     }
     
-    /**
-     * Detect Frida injection framework
-     */
     private boolean detectFrida() {
-        // Check for Frida server ports
         for (int port : FRIDA_PORTS) {
             try {
                 java.net.Socket socket = new java.net.Socket("127.0.0.1", port);
                 socket.close();
-                return true; // Port is open = Frida running
+                return true;
             } catch (Exception ignored) {}
         }
-        
-        // Check for Frida library in maps
         try {
             BufferedReader reader = new BufferedReader(
                 new InputStreamReader(Runtime.getRuntime().exec("cat /proc/self/maps").getInputStream()));
@@ -392,23 +487,15 @@ public class SecurityMonitor {
             }
             reader.close();
         } catch (Exception ignored) {}
-        
-        // Check for Frida named pipes
         File fridaPipe = new File("/data/local/tmp/frida-server");
         File fridaPipe2 = new File("/data/local/tmp/re.frida.server");
         if (fridaPipe.exists() || fridaPipe2.exists()) return true;
-        
         return false;
     }
     
-    /**
-     * Detect APK file tampering by checking DEX file count
-     * If someone adds/modifies code, DEX count may change
-     */
     private boolean detectApkTampering() {
         if (expectedDexCount <= 0) return false;
-        int currentCount = countDexFiles();
-        return currentCount != expectedDexCount;
+        return countDexFiles() != expectedDexCount;
     }
     
     private int countDexFiles() {
@@ -426,28 +513,15 @@ public class SecurityMonitor {
         } catch (Exception e) { return -1; }
     }
     
-    /**
-     * Detect root by checking for common root files
-     */
     private boolean detectRootFiles() {
         String[] rootPaths = {
-            "/system/app/Superuser.apk",
-            "/system/xbin/su",
-            "/system/bin/su",
-            "/sbin/su",
-            "/data/local/xbin/su",
-            "/data/local/bin/su",
-            "/data/local/su",
-            "/su/bin/su",
-            "/system/bin/.ext/.su",
-            "/system/usr/we-need-root/su-backup",
+            "/system/app/Superuser.apk", "/system/xbin/su", "/system/bin/su",
+            "/sbin/su", "/data/local/xbin/su", "/data/local/bin/su",
+            "/data/local/su", "/su/bin/su", "/system/bin/.ext/.su",
         };
-        
         for (String path : rootPaths) {
             if (new File(path).exists()) return true;
         }
-        
-        // Check if su is accessible
         try {
             Process process = Runtime.getRuntime().exec(new String[]{"which", "su"});
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -455,7 +529,6 @@ public class SecurityMonitor {
             reader.close();
             if (result != null && !result.isEmpty()) return true;
         } catch (Exception ignored) {}
-        
         return false;
     }
 }
