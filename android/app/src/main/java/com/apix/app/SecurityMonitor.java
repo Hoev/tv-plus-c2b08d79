@@ -119,13 +119,14 @@ public class SecurityMonitor {
         if (detectSniffers()) return "تم اكتشاف برنامج مراقبة";
         if (detectCloudPhone()) return "لا يمكن تشغيل التطبيق على هاتف سحابي";
         if (detectSecondaryDisplay()) return "لا يمكن تشغيل التطبيق على شاشة ثانوية";
-        if (detectEmulator()) return "لا يمكن تشغيل التطبيق على محاكي";
+        // Emulator & Root allowed
+        // if (detectEmulator()) return "لا يمكن تشغيل التطبيق على محاكي";
         if (detectProxy()) return "تم اكتشاف بروكسي";
         if (detectDebugger()) return "تم اكتشاف مصحح أخطاء";
         if (detectSignatureTampering()) return "تم التلاعب بالتطبيق";
         if (detectApkTampering()) return "تم تعديل ملفات التطبيق";
         if (detectFrida()) return "تم اكتشاف أداة اختراق";
-        if (detectRootFiles()) return "الجهاز مروت";
+        // if (detectRootFiles()) return "الجهاز مروت";
         return null; // All checks passed
     }
 
@@ -151,8 +152,9 @@ public class SecurityMonitor {
                     if (detectSniffers()) { killApp(); return; }
                     if (detectCloudPhone()) { killApp(); return; }
                     if (detectSecondaryDisplay()) { killApp(); return; }
+                    // Emulator & Root allowed
+                    // if (detectEmulator()) { killApp(); return; }
                     if (detectProxy()) { killApp(); return; }
-                    if (detectEmulator()) { killApp(); return; }
                     if (detectHostsModification()) { killApp(); return; }
                     if (detectUnauthorizedVPN()) { killApp(); return; }
                     if (detectSignatureTampering()) { killApp(); return; }
@@ -160,7 +162,7 @@ public class SecurityMonitor {
                     if (detectDebugger()) { killApp(); return; }
                     if (detectFrida()) { killApp(); return; }
                     if (detectApkTampering()) { killApp(); return; }
-                    if (detectRootFiles()) { killApp(); return; }
+                    // if (detectRootFiles()) { killApp(); return; }
                     
                     Thread.sleep(5 + (long)(Math.random() * 14));
                 } catch (InterruptedException e) {
