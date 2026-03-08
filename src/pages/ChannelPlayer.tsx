@@ -140,6 +140,14 @@ const ChannelPlayer: React.FC = () => {
     }
   }, [loading, isPlayerMode, channelWithSubmenu]);
 
+  // Make sub-channel page fully independent from main TV layout styles
+  useEffect(() => {
+    document.body.classList.add('subchannel-page-active');
+    return () => {
+      document.body.classList.remove('subchannel-page-active');
+    };
+  }, []);
+
   if (loading) {
     return (
       <div style={{
