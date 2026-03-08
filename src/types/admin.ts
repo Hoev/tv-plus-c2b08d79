@@ -71,6 +71,7 @@ export interface SubChannel {
   stream: StreamConfig;
   sortOrder: number;
   preferredPlayer?: WebPlayerType;
+  iosPlayerApp?: iOSPlayerApp;
   hidden?: boolean;
   
   // Android-specific
