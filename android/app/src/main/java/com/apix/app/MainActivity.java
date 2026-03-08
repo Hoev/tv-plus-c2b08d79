@@ -1,4 +1,4 @@
-package app.lovable.tvplus;
+package com.apix.app;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
@@ -16,10 +16,10 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.gson.Gson;
 
-import app.lovable.tvplus.databinding.ActivityMainBinding;
+import com.apix.app.databinding.ActivityMainBinding;
 
 /**
- * Main Activity hosting the WebView that loads the TV Plus web app
+ * Main Activity hosting the WebView that loads the APiX web app
  * Handles the split Web/Android architecture with different action types
  */
 public class MainActivity extends AppCompatActivity {
@@ -29,7 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private Gson gson = new Gson();
     
     // Your web app URL
-    private static final String WEB_APP_URL = "https://tv-plus-c2b08d79.vercel.app";
+    private static final String WEB_APP_URL = "https://tv-plus.lovable.app";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -54,51 +54,34 @@ public class MainActivity extends AppCompatActivity {
     private void setupWebView() {
         WebSettings settings = webView.getSettings();
         
-        // Enable JavaScript
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
-        
-        // Enable caching
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setAllowFileAccess(true);
-        
-        // Enable media playback
         settings.setMediaPlaybackRequiresUserGesture(false);
-        
-        // Enable mixed content (HTTP + HTTPS)
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         
-        // User Agent
         String userAgent = settings.getUserAgentString();
-        settings.setUserAgentString(userAgent + " TVPlusAndroid/1.0");
+        settings.setUserAgentString(userAgent + " APiXAndroid/1.0");
         
-        // WebView clients
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // Keep all navigation within the WebView
                 return false;
             }
             
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                Log.e("MainActivity", "WebView error: " + description + " url: " + failingUrl);
-                // Retry loading after a short delay
+                Log.e("MainActivity", "WebView error: " + description);
                 view.postDelayed(() -> view.loadUrl(WEB_APP_URL), 2000);
             }
         });
         
         webView.setWebChromeClient(new WebChromeClient());
-        
-        // Add JavaScript interface for native player
         webView.addJavascriptInterface(new AndroidBridge(), "Android");
     }
 
-    /**
-     * JavaScript Interface exposed to the web app
-     * Call from JS: window.Android.playVideo(jsonConfig)
-     */
     public class AndroidBridge {
         
         @JavascriptInterface
@@ -106,25 +89,19 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 try {
                     StreamConfig config = gson.fromJson(jsonConfig, StreamConfig.class);
-                    
                     if (config == null) {
                         showToast("Invalid stream configuration");
                         return;
                     }
-                    
                     launchPlayer(config, jsonConfig);
-                    
                 } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, 
-                        "Error: " + e.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             });
         }
         
         @JavascriptInterface
         public void checkAdGate(String categoryId) {
-            // Ad gate disabled - always allow
             runOnUiThread(() -> {
                 webView.evaluateJavascript("window.__adGateResult && window.__adGateResult(true)", null);
             });
@@ -172,17 +149,12 @@ public class MainActivity extends AppCompatActivity {
     private void launchIntent(String intentUri) {
         try {
             Intent intent = Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME);
-            
-            // Check if app is installed
             if (intent.resolveActivity(getPackageManager()) != null) {
                 startActivity(intent);
             } else {
-                // Try to open in Play Store
                 String packageName = intent.getPackage();
                 if (packageName != null) {
-                    Intent storeIntent = new Intent(Intent.ACTION_VIEW, 
-                        Uri.parse("market://details?id=" + packageName));
-                    startActivity(storeIntent);
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + packageName)));
                 } else {
                     showToast("Application not found");
                 }

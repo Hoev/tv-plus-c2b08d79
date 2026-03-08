@@ -1,4 +1,4 @@
-package app.lovable.tvplus;
+package com.apix.app;
 
 import android.app.AlertDialog;
 import android.app.Dialog;

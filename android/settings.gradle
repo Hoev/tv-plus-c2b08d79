@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TVPlus"
+rootProject.name = "APiX"
 include ':app'

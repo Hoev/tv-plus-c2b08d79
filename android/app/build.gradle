@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'app.lovable.tvplus'
+    namespace 'com.apix.app'
     compileSdk 34
 
     defaultConfig {
-        applicationId "app.lovable.tvplus"
+        applicationId "com.apix.app"
         minSdk 24
         targetSdk 34
         versionCode 1
@@ -16,7 +16,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
@@ -47,8 +48,6 @@ dependencies {
     implementation 'androidx.media3:media3-exoplayer-dash:1.2.1'
     implementation 'androidx.media3:media3-datasource-okhttp:1.2.1'
     
-    // Cast SDK (Chromecast) - removed per request
-
     // OkHttp for custom headers
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     
