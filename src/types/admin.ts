@@ -99,6 +99,7 @@ export interface Channel {
   sideMenuId?: string;
   externalUrl?: string;
   preferredPlayer?: WebPlayerType;
+  iosPlayerApp?: iOSPlayerApp;
   
   // === Android Settings ===
   androidStream?: AndroidStreamConfig;
