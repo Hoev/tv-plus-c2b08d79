@@ -4,7 +4,7 @@ export type ActionType = 'direct_play' | 'open_submenu' | 'external_link';
 export type WebPlayerType = 'default' | 'custom' | 'iframe' | 'secure' | 'external_ios';
 
 // iOS external player apps
-export type iOSPlayerApp = 'vlc' | 'nplayer' | 'infuse' | 'outplayer';
+export type iOSPlayerApp = 'vlc' | 'outplayer' | 'infuse' | 'kmplayer';
 
 export interface iOSPlayerConfig {
   app: iOSPlayerApp;
