@@ -596,9 +596,6 @@ public class PlayerActivity extends AppCompatActivity {
         
         playerView.setPlayer(player);
         
-        // Build media source with DRM if configured
-        MediaSource mediaSource = buildMediaSource(dataSourceFactory);
-        
         // Add listener
         player.addListener(new Player.Listener() {
             @Override
@@ -629,9 +626,103 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         
-        player.setMediaSource(mediaSource);
-        player.prepare();
-        player.setPlayWhenReady(true);
+        // Build media source async (ClearKey API fetch needs background thread)
+        buildMediaSourceAsync(dataSourceFactory, mediaSource -> {
+            runOnUiThread(() -> {
+                if (player != null) {
+                    player.setMediaSource(mediaSource);
+                    player.prepare();
+                    player.setPlayWhenReady(true);
+                }
+            });
+        });
+    }
+    
+    private interface MediaSourceCallback {
+        void onReady(MediaSource source);
+    }
+    
+    private void buildMediaSourceAsync(DataSource.Factory factory, MediaSourceCallback callback) {
+        // If no DRM or no ClearKey API needed, build synchronously
+        if (!streamConfig.hasDrm() || streamConfig.drm == null) {
+            callback.onReady(buildMediaSource(factory, null));
+            return;
+        }
+        
+        String scheme = streamConfig.drm.scheme != null ? 
+            streamConfig.drm.scheme.toLowerCase() : "clearkey";
+        
+        if (!"clearkey".equals(scheme)) {
+            // Widevine/PlayReady don't need API fetch
+            callback.onReady(buildMediaSource(factory, null));
+            return;
+        }
+        
+        // ClearKey: may need API fetch on background thread
+        new Thread(() -> {
+            String resolvedClearKeyJson = resolveClearKey();
+            callback.onReady(buildMediaSource(factory, resolvedClearKeyJson));
+        }).start();
+    }
+    
+    /**
+     * Resolve ClearKey JSON from various sources (runs on background thread)
+     */
+    private String resolveClearKey() {
+        if (streamConfig.drm == null) return null;
+        
+        String keyId = streamConfig.drm.keyId;
+        String key = streamConfig.drm.key;
+        String licenseUrl = streamConfig.drm.licenseUrl;
+        
+        // Strategy 1: License URL API endpoint (no keyId provided)
+        if (licenseUrl != null && !licenseUrl.isEmpty() && 
+            licenseUrl.startsWith("http") && (keyId == null || keyId.isEmpty())) {
+            Log.d(TAG, "ClearKey: Fetching from license API: " + licenseUrl);
+            String json = fetchClearKeyFromApi(licenseUrl);
+            if (json != null) return json;
+        }
+        
+        // Strategy 2: keyId contains URL
+        if (keyId != null && keyId.contains("http")) {
+            String apiUrl = keyId.contains(":http") ? 
+                keyId.substring(keyId.indexOf("http")) : keyId;
+            Log.d(TAG, "ClearKey: Extracted API from keyId: " + apiUrl);
+            String json = fetchClearKeyFromApi(apiUrl);
+            if (json != null) return json;
+        }
+        
+        // Strategy 3: Direct hex keyId + key
+        if (keyId != null && !keyId.isEmpty() && key != null && !key.isEmpty()) {
+            keyId = keyId.replaceAll("[^a-fA-F0-9]", "");
+            key = key.replaceAll("[^a-fA-F0-9]", "");
+            if (keyId.length() >= 32) keyId = keyId.substring(0, 32);
+            if (key.length() >= 32) key = key.substring(0, 32);
+            Log.d(TAG, "ClearKey: Building from hex keyId+key");
+            return buildClearKeyJson(keyId, key);
+        }
+        
+        // Strategy 4: Combined "keyId:key" format
+        if (keyId != null && keyId.contains(":") && !keyId.contains("http")) {
+            String[] parts = keyId.split(":");
+            if (parts.length >= 2) {
+                String kid = parts[0].replaceAll("[^a-fA-F0-9]", "");
+                String k = parts[1].replaceAll("[^a-fA-F0-9]", "");
+                if (kid.length() >= 32) kid = kid.substring(0, 32);
+                if (k.length() >= 32) k = k.substring(0, 32);
+                Log.d(TAG, "ClearKey: Building from combined format");
+                return buildClearKeyJson(kid, k);
+            }
+        }
+        
+        // Strategy 5: License URL with keyid/key params
+        if (licenseUrl != null && !licenseUrl.isEmpty()) {
+            Log.d(TAG, "ClearKey: Fetching from licenseUrl: " + licenseUrl);
+            String json = fetchClearKeyFromApi(licenseUrl);
+            if (json != null) return json;
+        }
+        
+        return null;
     }
 
     private DataSource.Factory buildDataSourceFactory() {
