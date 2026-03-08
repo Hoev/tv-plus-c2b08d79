@@ -318,14 +318,19 @@ const ChannelPlayer: React.FC = () => {
             overflow: auto !important;
             flex-direction: column !important;
           }
+          /* Smart sizing: calculate card width from viewport height so 2 rows fit on screen */
+          /* Available height = 100vh - 100px (header+padding), each row = half, aspect 16:9 */
           .subchannel-grid {
-            grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
-            gap: 20px !important;
+            grid-template-columns: repeat(auto-fill, minmax(calc((100vh - 100px) / 2 * 16 / 9), 1fr)) !important;
+            gap: 16px !important;
             max-width: none !important;
             width: 100% !important;
           }
+          .subchannel-card {
+            max-height: calc((100vh - 100px) / 2) !important;
+          }
           .subchannel-title {
-            font-size: 20px;
+            font-size: clamp(14px, 2vh, 20px);
           }
         }
         .subchannel-card {
