@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update, remove, set } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { SideMenu, SubChannel, StreamConfig, AndroidStreamConfig, AndroidActionType } from '@/types/admin';
-import type { WebPlayerType } from '@/types/admin';
+import type { WebPlayerType, iOSPlayerApp } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
