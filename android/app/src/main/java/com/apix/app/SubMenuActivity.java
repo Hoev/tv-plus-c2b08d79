@@ -124,14 +124,54 @@ public class SubMenuActivity extends AppCompatActivity {
             return;
         }
 
-        // Build native player config
+        // Build native player config with full DRM support
         com.apix.app.StreamConfig config = new com.apix.app.StreamConfig();
         config.title = channel.name;
 
         if (channel.androidStream != null && channel.androidStream.url != null) {
             config.url = channel.androidStream.url;
+            config.actionType = channel.androidActionType;
+
+            if (channel.androidStream.headers != null) {
+                config.headers = new com.apix.app.StreamConfig.Headers();
+                config.headers.userAgent = channel.androidStream.headers.get("userAgent");
+                config.headers.referer = channel.androidStream.headers.get("referrer");
+                config.headers.cookie = channel.androidStream.headers.get("cookie");
+                config.headers.origin = channel.androidStream.headers.get("origin");
+            }
+
+            if (channel.androidStream.drmScheme != null) {
+                config.drm = new com.apix.app.StreamConfig.DrmConfig();
+                config.drm.scheme = channel.androidStream.drmScheme;
+                config.drm.licenseUrl = channel.androidStream.drmLicenseUrl;
+                String keyId = channel.androidStream.drmKeyId;
+                String key = channel.androidStream.drmKey;
+                if ("combined".equals(channel.androidStream.drmClearKeyMode) &&
+                    channel.androidStream.drmClearKeyCombined != null) {
+                    String[] parts = channel.androidStream.drmClearKeyCombined.split(":");
+                    if (parts.length == 2) { keyId = parts[0]; key = parts[1]; }
+                }
+                config.drm.keyId = keyId;
+                config.drm.key = key;
+            }
+
+            if (channel.androidStream.servers != null) {
+                config.servers = new java.util.ArrayList<>();
+                for (FirebaseModels.Server s : channel.androidStream.servers) {
+                    com.apix.app.StreamConfig.Server server = new com.apix.app.StreamConfig.Server();
+                    server.name = s.name;
+                    server.url = s.url;
+                    config.servers.add(server);
+                }
+            }
         } else if (channel.stream != null) {
             config.url = channel.stream.url;
+            if (channel.stream.userAgent != null || channel.stream.referrer != null) {
+                config.headers = new com.apix.app.StreamConfig.Headers();
+                config.headers.userAgent = channel.stream.userAgent;
+                config.headers.referer = channel.stream.referrer;
+                config.headers.cookie = channel.stream.cookies;
+            }
         }
 
         if (config.url == null || config.url.isEmpty()) {
