@@ -186,8 +186,18 @@ const ChannelPlayer: React.FC = () => {
 
   return (
     <div style={{
-      background: '#000', minHeight: '100vh', padding: 20,
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      background: '#000',
+      position: 'fixed',
+      inset: 0,
+      width: '100vw',
+      minHeight: '100vh',
+      padding: 20,
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      boxSizing: 'border-box',
     }}>
       {/* Header */}
       <header style={{
