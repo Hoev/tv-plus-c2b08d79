@@ -33,6 +33,7 @@ const SideMenuManager: React.FC = () => {
     // Web settings
     stream: StreamConfig;
     preferredPlayer: WebPlayerType;
+    iosPlayerApp?: iOSPlayerApp;
     // Android settings
     androidStream: Partial<AndroidStreamConfig>;
     androidActionType: AndroidActionType;
