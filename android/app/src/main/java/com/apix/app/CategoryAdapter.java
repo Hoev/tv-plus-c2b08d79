@@ -91,42 +91,67 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         FirebaseModels.Category cat = data.get(position);
         holder.name.setText(cat.name);
 
-        // Set icon
+        // إعداد الأيقونة
         int iconRes = getIconForCategory(cat.name);
         if (holder.icon != null) {
             holder.icon.setImageResource(iconRes);
         }
 
         boolean isSelected = position == selectedPosition;
-        int activeColor = Color.parseColor("#FFD700");
-        holder.name.setTextColor(isSelected ? activeColor : Color.WHITE);
-        if (holder.icon != null) {
-            holder.icon.setColorFilter(isSelected ? activeColor : Color.WHITE, PorterDuff.Mode.SRC_IN);
-        }
-        holder.indicator.setVisibility(isSelected ? View.VISIBLE : View.INVISIBLE);
+        holder.itemView.setSelected(isSelected); // هذا السطر يفعل الخلفية الذهبية للتلفاز
 
+        int goldColor = Color.parseColor("#FFC107");
+        int whiteColor = Color.WHITE;
+        int blackColor = Color.BLACK;
+
+        // تطبيق الألوان بناءً على نوع الشاشة (هاتف أو تلفاز)
+        if (isSideMode) {
+            // وضع التلفاز: الخلفية ذهبية، إذن النص يجب أن يكون أسود
+            int color = isSelected ? blackColor : whiteColor;
+            holder.name.setTextColor(color);
+            if (holder.icon != null) {
+                holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+            }
+            if (holder.indicator != null) holder.indicator.setVisibility(View.GONE);
+        } else {
+            // وضع الهاتف: الخلفية داكنة، إذن النص يجب أن يكون ذهبي
+            int color = isSelected ? goldColor : whiteColor;
+            holder.name.setTextColor(color);
+            if (holder.icon != null) {
+                holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+            }
+            if (holder.indicator != null) holder.indicator.setVisibility(isSelected ? View.VISIBLE : View.INVISIBLE);
+        }
+
+        // تفاعل النقر (اللمس)
         holder.itemView.setOnClickListener(v -> {
             int pos = holder.getAdapterPosition();
-            setSelected(pos);
-            listener.onClick(data.get(pos));
+            if (pos != RecyclerView.NO_POSITION) {
+                setSelected(pos);
+                listener.onClick(data.get(pos));
+            }
         });
 
-        // TV D-pad focus with strong visual feedback
+        // تفاعل الريموت كنترول (TV D-pad focus)
         holder.itemView.setFocusable(true);
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                holder.name.setTextColor(activeColor);
+            boolean sel = holder.getAdapterPosition() == selectedPosition;
+            
+            if (isSideMode) {
+                int color = (hasFocus || sel) ? blackColor : whiteColor;
+                holder.name.setTextColor(color);
                 if (holder.icon != null) {
-                    holder.icon.setColorFilter(activeColor, PorterDuff.Mode.SRC_IN);
+                    holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
                 }
-                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(100).start();
+                // تأثير تكبير ناعم للزر عند الوقوف عليه بالريموت
+                float scale = hasFocus ? 1.05f : 1.0f;
+                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start();
             } else {
-                boolean sel = holder.getAdapterPosition() == selectedPosition;
-                holder.name.setTextColor(sel ? activeColor : Color.WHITE);
+                int color = (hasFocus || sel) ? goldColor : whiteColor;
+                holder.name.setTextColor(color);
                 if (holder.icon != null) {
-                    holder.icon.setColorFilter(sel ? activeColor : Color.WHITE, PorterDuff.Mode.SRC_IN);
+                    holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
                 }
-                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
             }
         });
     }
