@@ -19,7 +19,8 @@ import java.util.List;
 
 /**
  * Adapter for channel cards (grid layout)
- * 16:9 aspect ratio cards with strong gold focus effect for TV remote
+ * 16:9 aspect ratio cards with name overlay at bottom-left
+ * Strong gold focus effect for TV remote navigation
  */
 public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHolder> {
 
@@ -86,20 +87,21 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
             if (hasFocus) {
                 v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start();
                 v.setElevation(16f);
-                // Strong gold border on card
                 holder.card.setCardElevation(12f);
-                holder.card.setCardBackgroundColor(Color.parseColor("#1A1A1A"));
-                // Gold outline via stroke on card's parent
+                // Gold outline
                 GradientDrawable glow = new GradientDrawable();
                 glow.setCornerRadius(16f);
                 glow.setStroke(5, Color.parseColor("#FFD700"));
                 glow.setColor(Color.TRANSPARENT);
                 v.setForeground(glow);
+                // Make name gold on focus
+                holder.name.setTextColor(Color.parseColor("#FFD700"));
             } else {
                 v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
                 v.setElevation(0f);
                 holder.card.setCardElevation(4f);
                 v.setForeground(null);
+                holder.name.setTextColor(Color.WHITE);
             }
         });
     }

@@ -11,8 +11,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
- * Splash screen with 3-second security check
- * Shows loading animation while performing all security checks
+ * Splash screen - shows loading bar only, no text feedback
  */
 public class SplashActivity extends AppCompatActivity {
 
@@ -29,28 +28,23 @@ public class SplashActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.splash_progress);
         errorText = findViewById(R.id.splash_error);
 
-        statusText.setText("جارِ فحص الأمان...");
+        // Hide status text - just show loading bar
+        statusText.setVisibility(View.GONE);
 
         // Run security check
         SecurityMonitor.getInstance(this).runInitialCheckAsync((passed, failReason) -> {
             new Handler(Looper.getMainLooper()).post(() -> {
                 if (passed) {
-                    statusText.setText("تم التحقق ✓");
-                    // Wait a moment then launch main activity
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        startActivity(new Intent(SplashActivity.this, HomeActivity.class));
-                        finish();
-                        // Start continuous monitoring
-                        SecurityMonitor.getInstance(SplashActivity.this).startMonitor();
-                    }, 500);
+                    // Directly launch home - no "verified" message
+                    startActivity(new Intent(SplashActivity.this, HomeActivity.class));
+                    finish();
+                    SecurityMonitor.getInstance(SplashActivity.this).startMonitor();
                 } else {
                     // Security check failed
                     progressBar.setVisibility(View.GONE);
-                    statusText.setVisibility(View.GONE);
                     errorText.setVisibility(View.VISIBLE);
                     errorText.setText(failReason != null ? failReason : "فشل فحص الأمان");
                     
-                    // Kill app after showing message
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         finishAffinity();
                         System.exit(0);

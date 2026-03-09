@@ -6,8 +6,15 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -38,9 +45,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Native Home Activity with responsive layout:
- * - Portrait: Bottom nav bar with categories, channels grid above
- * - Landscape/TV: Side nav with app name + categories, channels grid on right
+ * Native Home Activity with responsive layout + search:
+ * - Portrait: Bottom nav bar with icons, channels grid above, search icon in header
+ * - Landscape/TV: Side nav with icons, channels grid on right, search icon in top bar
  */
 public class HomeActivity extends AppCompatActivity {
 
@@ -58,6 +65,12 @@ public class HomeActivity extends AppCompatActivity {
     private RecyclerView channelsRecyclerLandscape;
     private TextView categoryTitleLandscape;
 
+    // Search
+    private LinearLayout searchOverlay;
+    private EditText searchInput;
+    private TextView searchCancel;
+    private RecyclerView searchResultsRecycler;
+
     private ProgressBar loadingBar;
     private LinearLayout errorLayout;
     private TextView errorText;
@@ -69,11 +82,15 @@ public class HomeActivity extends AppCompatActivity {
     private Map<String, FirebaseModels.SideMenu> sideMenus = new HashMap<>();
     private FirebaseModels.Category selectedCategory;
 
+    // All channels flat list for search
+    private List<FirebaseModels.Channel> allChannels = new ArrayList<>();
+
     // Adapters for both modes
     private CategoryAdapter categoryAdapterPortrait;
     private CategoryAdapter categoryAdapterLandscape;
     private ChannelAdapter channelAdapterPortrait;
     private ChannelAdapter channelAdapterLandscape;
+    private ChannelAdapter searchAdapter;
 
     private boolean isLandscape = false;
 
@@ -115,6 +132,44 @@ public class HomeActivity extends AppCompatActivity {
         channelsRecyclerLandscape = findViewById(R.id.channels_recycler_landscape);
         categoryTitleLandscape = findViewById(R.id.category_title_landscape);
 
+        // Search
+        searchOverlay = findViewById(R.id.search_overlay);
+        searchInput = findViewById(R.id.search_input);
+        searchCancel = findViewById(R.id.search_cancel);
+        searchResultsRecycler = findViewById(R.id.search_results_recycler);
+
+        // Search buttons
+        ImageButton searchBtnPortrait = findViewById(R.id.search_button_portrait);
+        ImageButton searchBtnLandscape = findViewById(R.id.search_button_landscape);
+
+        searchBtnPortrait.setOnClickListener(v -> showSearch());
+        searchBtnLandscape.setOnClickListener(v -> showSearch());
+        searchCancel.setOnClickListener(v -> hideSearch());
+
+        // Search input listener
+        searchInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performSearch(searchInput.getText().toString());
+                return true;
+            }
+            return false;
+        });
+
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                performSearch(s.toString());
+            }
+        });
+
+        // Search results adapter
+        searchAdapter = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
+        int searchSpan = getResources().getConfiguration().orientation ==
+            Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
+        searchResultsRecycler.setLayoutManager(new GridLayoutManager(this, searchSpan));
+        searchResultsRecycler.setAdapter(searchAdapter);
+
         // Setup portrait adapters (horizontal categories at bottom)
         categoriesRecyclerPortrait.setLayoutManager(
             new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
@@ -139,6 +194,57 @@ public class HomeActivity extends AppCompatActivity {
 
         // Apply initial layout
         applyLayout();
+    }
+
+    private void showSearch() {
+        searchOverlay.setVisibility(View.VISIBLE);
+        searchInput.requestFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT);
+    }
+
+    private void hideSearch() {
+        searchOverlay.setVisibility(View.GONE);
+        searchInput.setText("");
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+    }
+
+    private void performSearch(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            searchAdapter.updateData(new ArrayList<>());
+            return;
+        }
+
+        String filter = query.toLowerCase().trim();
+        List<FirebaseModels.Channel> results = new ArrayList<>();
+
+        for (FirebaseModels.Channel ch : allChannels) {
+            if (ch.name != null && ch.name.toLowerCase().contains(filter)) {
+                results.add(ch);
+            }
+        }
+
+        // Also search sub-menus
+        for (FirebaseModels.SideMenu menu : sideMenus.values()) {
+            if (menu.channels != null) {
+                for (FirebaseModels.SubChannel sc : menu.channels.values()) {
+                    if (sc.name != null && sc.name.toLowerCase().contains(filter)) {
+                        FirebaseModels.Channel ch = new FirebaseModels.Channel();
+                        ch.id = sc.id;
+                        ch.name = sc.name;
+                        ch.imageUrl = sc.imageUrl;
+                        ch.actionType = "direct_play";
+                        ch.stream = sc.stream;
+                        ch.androidStream = sc.androidStream;
+                        ch.androidActionType = sc.androidActionType;
+                        results.add(ch);
+                    }
+                }
+            }
+        }
+
+        searchAdapter.updateData(results);
     }
 
     private void applyLayout() {
@@ -193,6 +299,8 @@ public class HomeActivity extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 categories.clear();
+                allChannels.clear();
+
                 for (DataSnapshot child : snapshot.getChildren()) {
                     try {
                         FirebaseModels.Category cat = child.getValue(FirebaseModels.Category.class);
@@ -206,6 +314,7 @@ public class HomeActivity extends AppCompatActivity {
                                     if (ch != null) {
                                         ch.id = chSnap.getKey();
                                         cat.channels.put(ch.id, ch);
+                                        if (!ch.hidden) allChannels.add(ch);
                                     }
                                 }
                                 categories.add(cat);
@@ -283,6 +392,11 @@ public class HomeActivity extends AppCompatActivity {
 
     private void onChannelClick(FirebaseModels.Channel channel) {
         if (channel == null) return;
+
+        // Hide search if open
+        if (searchOverlay.getVisibility() == View.VISIBLE) {
+            hideSearch();
+        }
 
         String actionType = channel.actionType != null ? channel.actionType : "direct_play";
 
@@ -417,6 +531,15 @@ public class HomeActivity extends AppCompatActivity {
         } catch (Exception e) {
             Toast.makeText(this, "فشل التشغيل", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (searchOverlay.getVisibility() == View.VISIBLE) {
+            hideSearch();
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override

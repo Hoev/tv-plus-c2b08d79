@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:visibility="visible">
 
-        <!-- App Header -->
+        <!-- App Header with search -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -27,13 +27,24 @@
 
             <TextView
                 android:id="@+id/app_name_portrait"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:text="APiX"
                 android:textColor="@color/gold_accent"
                 android:textSize="26sp"
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-medium" />
+
+            <ImageButton
+                android:id="@+id/search_button_portrait"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_search"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Search"
+                android:tint="@color/white"
+                android:focusable="true" />
         </LinearLayout>
 
         <!-- Category title -->
@@ -58,7 +69,7 @@
             android:clipToPadding="false"
             android:padding="8dp" />
 
-        <!-- Bottom Navigation Bar -->
+        <!-- Bottom Navigation Bar with icons -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -73,8 +84,8 @@
                 android:clipToPadding="false"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="12dp" />
+                android:paddingTop="6dp"
+                android:paddingBottom="10dp" />
         </HorizontalScrollView>
     </LinearLayout>
 
@@ -107,7 +118,7 @@
                 android:gravity="center"
                 android:paddingBottom="20dp" />
 
-            <!-- Categories list (vertical) -->
+            <!-- Categories list (vertical) with icons -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/categories_recycler_landscape"
                 android:layout_width="match_parent"
@@ -125,18 +136,36 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- Category title -->
-            <TextView
-                android:id="@+id/category_title_landscape"
+            <!-- Top bar with search + title -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/white"
-                android:textSize="22sp"
-                android:textStyle="bold"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
                 android:paddingTop="16dp"
-                android:paddingBottom="12dp" />
+                android:paddingBottom="12dp">
+
+                <TextView
+                    android:id="@+id/category_title_landscape"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/white"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <ImageButton
+                    android:id="@+id/search_button_landscape"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/ic_search"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Search"
+                    android:tint="@color/white"
+                    android:focusable="true" />
+            </LinearLayout>
 
             <!-- Channels grid -->
             <androidx.recyclerview.widget.RecyclerView
@@ -147,6 +176,69 @@
                 android:clipToPadding="false"
                 android:padding="8dp" />
         </LinearLayout>
+    </LinearLayout>
+
+    <!-- Search overlay -->
+    <LinearLayout
+        android:id="@+id/search_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="#E6000000"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Search"
+                android:textColor="@color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/search_cancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cancel"
+                android:textColor="@color/gold_accent"
+                android:textSize="16sp"
+                android:padding="8dp"
+                android:focusable="true"
+                android:clickable="true" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/search_input"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="#333333"
+            android:textColor="@color/white"
+            android:textColorHint="#888888"
+            android:hint="Type channel name..."
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:textSize="16sp"
+            android:singleLine="true"
+            android:imeOptions="actionSearch"
+            android:focusable="true" />
+
+        <!-- Search results -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_results_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="16dp"
+            android:clipToPadding="false" />
     </LinearLayout>
 
     <!-- Loading -->

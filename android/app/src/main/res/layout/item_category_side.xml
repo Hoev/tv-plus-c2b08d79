@@ -21,6 +21,15 @@
         android:background="@color/gold_accent"
         android:visibility="invisible" />
 
+    <!-- Category Icon -->
+    <ImageView
+        android:id="@+id/category_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="10dp"
+        android:tint="@color/white"
+        android:contentDescription="Icon" />
+
     <TextView
         android:id="@+id/category_name"
         android:layout_width="0dp"
