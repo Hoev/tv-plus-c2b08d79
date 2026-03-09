@@ -16,10 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Adapter for category tabs with icons
- * Supports both horizontal (bottom) and vertical (side) modes
- */
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHolder> {
 
     public interface OnCategoryClick {
@@ -32,7 +28,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
     private int selectedPosition = 0;
     private boolean isSideMode = false;
 
-    // Map category names to drawable icons
     private static final Map<String, Integer> ICON_MAP = new HashMap<>();
     static {
         ICON_MAP.put("sport", R.drawable.ic_sport);
@@ -91,22 +86,19 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         FirebaseModels.Category cat = data.get(position);
         holder.name.setText(cat.name);
 
-        // إعداد الأيقونة
         int iconRes = getIconForCategory(cat.name);
         if (holder.icon != null) {
             holder.icon.setImageResource(iconRes);
         }
 
         boolean isSelected = position == selectedPosition;
-        holder.itemView.setSelected(isSelected); // هذا السطر يفعل الخلفية الذهبية للتلفاز
+        holder.itemView.setSelected(isSelected);
 
         int goldColor = Color.parseColor("#FFC107");
         int whiteColor = Color.WHITE;
         int blackColor = Color.BLACK;
 
-        // تطبيق الألوان بناءً على نوع الشاشة (هاتف أو تلفاز)
         if (isSideMode) {
-            // وضع التلفاز: الخلفية ذهبية، إذن النص يجب أن يكون أسود
             int color = isSelected ? blackColor : whiteColor;
             holder.name.setTextColor(color);
             if (holder.icon != null) {
@@ -114,7 +106,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
             }
             if (holder.indicator != null) holder.indicator.setVisibility(View.GONE);
         } else {
-            // وضع الهاتف: الخلفية داكنة، إذن النص يجب أن يكون ذهبي
             int color = isSelected ? goldColor : whiteColor;
             holder.name.setTextColor(color);
             if (holder.icon != null) {
@@ -123,7 +114,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
             if (holder.indicator != null) holder.indicator.setVisibility(isSelected ? View.VISIBLE : View.INVISIBLE);
         }
 
-        // تفاعل النقر (اللمس)
         holder.itemView.setOnClickListener(v -> {
             int pos = holder.getAdapterPosition();
             if (pos != RecyclerView.NO_POSITION) {
@@ -132,7 +122,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
             }
         });
 
-        // تفاعل الريموت كنترول (TV D-pad focus)
         holder.itemView.setFocusable(true);
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
             boolean sel = holder.getAdapterPosition() == selectedPosition;
@@ -143,7 +132,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
                 if (holder.icon != null) {
                     holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
                 }
-                // تأثير تكبير ناعم للزر عند الوقوف عليه بالريموت
                 float scale = hasFocus ? 1.05f : 1.0f;
                 v.animate().scaleX(scale).scaleY(scale).setDuration(150).start();
             } else {
