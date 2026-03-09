@@ -163,10 +163,10 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
 
-        // Search results adapter (Modified for 3 and 6 columns)
+        // Search results adapter
         searchAdapter = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         int searchSpan = getResources().getConfiguration().orientation ==
-            Configuration.ORIENTATION_LANDSCAPE ? 6 : 3;
+            Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
         searchResultsRecycler.setLayoutManager(new GridLayoutManager(this, searchSpan));
         searchResultsRecycler.setAdapter(searchAdapter);
 
@@ -177,8 +177,7 @@ public class HomeActivity extends AppCompatActivity {
         categoryAdapterPortrait.setSideMode(false);
         categoriesRecyclerPortrait.setAdapter(categoryAdapterPortrait);
 
-        // Portrait channels grid (Modified to 3 columns)
-        channelsRecyclerPortrait.setLayoutManager(new GridLayoutManager(this, 3));
+        channelsRecyclerPortrait.setLayoutManager(new GridLayoutManager(this, 2));
         channelAdapterPortrait = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         channelsRecyclerPortrait.setAdapter(channelAdapterPortrait);
 
@@ -189,8 +188,7 @@ public class HomeActivity extends AppCompatActivity {
         categoryAdapterLandscape.setSideMode(true);
         categoriesRecyclerLandscape.setAdapter(categoryAdapterLandscape);
 
-        // Landscape channels grid (Modified to 6 columns)
-        channelsRecyclerLandscape.setLayoutManager(new GridLayoutManager(this, 6));
+        channelsRecyclerLandscape.setLayoutManager(new GridLayoutManager(this, 4));
         channelAdapterLandscape = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         channelsRecyclerLandscape.setAdapter(channelAdapterLandscape);
 

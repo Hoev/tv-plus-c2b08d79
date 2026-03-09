@@ -21,6 +21,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Sub Menu Activity - shows sub-channels for a category with open_submenu action
+ * Matches the website's ChannelPlayer sub-channel page
+ */
 public class SubMenuActivity extends AppCompatActivity {
 
     private RecyclerView channelsRecycler;
@@ -57,6 +61,7 @@ public class SubMenuActivity extends AppCompatActivity {
             return;
         }
 
+        // Convert sub-channels to channel format for adapter reuse
         List<FirebaseModels.Channel> channels = new ArrayList<>();
         for (FirebaseModels.SubChannel sc : menu.channels.values()) {
             if (!sc.hidden) {
@@ -77,7 +82,7 @@ public class SubMenuActivity extends AppCompatActivity {
         Collections.sort(channels, (a, b) -> a.sortOrder - b.sortOrder);
 
         int spanCount = getResources().getConfiguration().orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 6 : 3;
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
         channelsRecycler.setLayoutManager(new GridLayoutManager(this, spanCount));
 
         ChannelAdapter adapter = new ChannelAdapter(this, channels, this::playSubChannel);
@@ -119,6 +124,7 @@ public class SubMenuActivity extends AppCompatActivity {
             return;
         }
 
+        // Build native player config with full DRM support
         com.apix.app.StreamConfig config = new com.apix.app.StreamConfig();
         config.title = channel.name;
 

@@ -16,6 +16,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Adapter for category tabs with icons
+ * Supports both horizontal (bottom) and vertical (side) modes
+ */
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHolder> {
 
     public interface OnCategoryClick {
@@ -28,6 +32,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
     private int selectedPosition = 0;
     private boolean isSideMode = false;
 
+    // Map category names to drawable icons
     private static final Map<String, Integer> ICON_MAP = new HashMap<>();
     static {
         ICON_MAP.put("sport", R.drawable.ic_sport);
@@ -86,60 +91,42 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         FirebaseModels.Category cat = data.get(position);
         holder.name.setText(cat.name);
 
+        // Set icon
         int iconRes = getIconForCategory(cat.name);
         if (holder.icon != null) {
             holder.icon.setImageResource(iconRes);
         }
 
         boolean isSelected = position == selectedPosition;
-        holder.itemView.setSelected(isSelected);
-
-        int goldColor = Color.parseColor("#FFC107");
-        int whiteColor = Color.WHITE;
-        int blackColor = Color.BLACK;
-
-        if (isSideMode) {
-            int color = isSelected ? blackColor : whiteColor;
-            holder.name.setTextColor(color);
-            if (holder.icon != null) {
-                holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
-            }
-            if (holder.indicator != null) holder.indicator.setVisibility(View.GONE);
-        } else {
-            int color = isSelected ? goldColor : whiteColor;
-            holder.name.setTextColor(color);
-            if (holder.icon != null) {
-                holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
-            }
-            if (holder.indicator != null) holder.indicator.setVisibility(isSelected ? View.VISIBLE : View.INVISIBLE);
+        int activeColor = Color.parseColor("#FFD700");
+        holder.name.setTextColor(isSelected ? activeColor : Color.WHITE);
+        if (holder.icon != null) {
+            holder.icon.setColorFilter(isSelected ? activeColor : Color.WHITE, PorterDuff.Mode.SRC_IN);
         }
+        holder.indicator.setVisibility(isSelected ? View.VISIBLE : View.INVISIBLE);
 
         holder.itemView.setOnClickListener(v -> {
             int pos = holder.getAdapterPosition();
-            if (pos != RecyclerView.NO_POSITION) {
-                setSelected(pos);
-                listener.onClick(data.get(pos));
-            }
+            setSelected(pos);
+            listener.onClick(data.get(pos));
         });
 
+        // TV D-pad focus with strong visual feedback
         holder.itemView.setFocusable(true);
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
-            boolean sel = holder.getAdapterPosition() == selectedPosition;
-            
-            if (isSideMode) {
-                int color = (hasFocus || sel) ? blackColor : whiteColor;
-                holder.name.setTextColor(color);
+            if (hasFocus) {
+                holder.name.setTextColor(activeColor);
                 if (holder.icon != null) {
-                    holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+                    holder.icon.setColorFilter(activeColor, PorterDuff.Mode.SRC_IN);
                 }
-                float scale = hasFocus ? 1.05f : 1.0f;
-                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start();
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(100).start();
             } else {
-                int color = (hasFocus || sel) ? goldColor : whiteColor;
-                holder.name.setTextColor(color);
+                boolean sel = holder.getAdapterPosition() == selectedPosition;
+                holder.name.setTextColor(sel ? activeColor : Color.WHITE);
                 if (holder.icon != null) {
-                    holder.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+                    holder.icon.setColorFilter(sel ? activeColor : Color.WHITE, PorterDuff.Mode.SRC_IN);
                 }
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
             }
         });
     }
