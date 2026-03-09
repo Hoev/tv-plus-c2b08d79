@@ -81,8 +81,9 @@ public class SubMenuActivity extends AppCompatActivity {
 
         Collections.sort(channels, (a, b) -> a.sortOrder - b.sortOrder);
 
+        // التعديل تم هنا: جعلنا الأعمدة 6 في الوضع العرضي و 3 في الهاتف
         int spanCount = getResources().getConfiguration().orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 6 : 3;
         channelsRecycler.setLayoutManager(new GridLayoutManager(this, spanCount));
 
         ChannelAdapter adapter = new ChannelAdapter(this, channels, this::playSubChannel);
