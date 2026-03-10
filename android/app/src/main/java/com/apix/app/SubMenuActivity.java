@@ -4,14 +4,10 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ImageButton;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -22,8 +18,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Sub Menu Activity - shows sub-channels for a category with open_submenu action
- * Matches the website's ChannelPlayer sub-channel page
+ * Sub Menu Activity - shows sub-channels for a category
+ * NO fullscreen - system bars visible like HomeActivity
  */
 public class SubMenuActivity extends AppCompatActivity {
 
@@ -36,7 +32,7 @@ public class SubMenuActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_submenu);
 
-        enableFullscreen();
+        // NO fullscreen here - keep system bars
 
         titleText = findViewById(R.id.submenu_title);
         channelsRecycler = findViewById(R.id.submenu_channels_recycler);
@@ -61,7 +57,6 @@ public class SubMenuActivity extends AppCompatActivity {
             return;
         }
 
-        // Convert sub-channels to channel format for adapter reuse
         List<FirebaseModels.Channel> channels = new ArrayList<>();
         for (FirebaseModels.SubChannel sc : menu.channels.values()) {
             if (!sc.hidden) {
@@ -81,21 +76,11 @@ public class SubMenuActivity extends AppCompatActivity {
 
         Collections.sort(channels, (a, b) -> a.sortOrder - b.sortOrder);
 
-        int spanCount = getResources().getConfiguration().orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
-        channelsRecycler.setLayoutManager(new GridLayoutManager(this, spanCount));
+        // Always 2 columns
+        channelsRecycler.setLayoutManager(new GridLayoutManager(this, 2));
 
         ChannelAdapter adapter = new ChannelAdapter(this, channels, this::playSubChannel);
         channelsRecycler.setAdapter(adapter);
-    }
-
-    private void enableFullscreen() {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(
-            getWindow(), getWindow().getDecorView());
-        controller.hide(WindowInsetsCompat.Type.systemBars());
-        controller.setSystemBarsBehavior(
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
     }
 
     private void playSubChannel(FirebaseModels.Channel channel) {
@@ -124,8 +109,7 @@ public class SubMenuActivity extends AppCompatActivity {
             return;
         }
 
-        // Build native player config with full DRM support
-        com.apix.app.StreamConfig config = new com.apix.app.StreamConfig();
+        StreamConfig config = new StreamConfig();
         config.title = channel.name;
 
         if (channel.androidStream != null && channel.androidStream.url != null) {
@@ -133,7 +117,7 @@ public class SubMenuActivity extends AppCompatActivity {
             config.actionType = channel.androidActionType;
 
             if (channel.androidStream.headers != null) {
-                config.headers = new com.apix.app.StreamConfig.Headers();
+                config.headers = new StreamConfig.Headers();
                 config.headers.userAgent = channel.androidStream.headers.get("userAgent");
                 config.headers.referer = channel.androidStream.headers.get("referrer");
                 config.headers.cookie = channel.androidStream.headers.get("cookie");
@@ -141,7 +125,7 @@ public class SubMenuActivity extends AppCompatActivity {
             }
 
             if (channel.androidStream.drmScheme != null) {
-                config.drm = new com.apix.app.StreamConfig.DrmConfig();
+                config.drm = new StreamConfig.DrmConfig();
                 config.drm.scheme = channel.androidStream.drmScheme;
                 config.drm.licenseUrl = channel.androidStream.drmLicenseUrl;
                 String keyId = channel.androidStream.drmKeyId;
@@ -158,7 +142,7 @@ public class SubMenuActivity extends AppCompatActivity {
             if (channel.androidStream.servers != null) {
                 config.servers = new java.util.ArrayList<>();
                 for (FirebaseModels.Server s : channel.androidStream.servers) {
-                    com.apix.app.StreamConfig.Server server = new com.apix.app.StreamConfig.Server();
+                    StreamConfig.Server server = new StreamConfig.Server();
                     server.name = s.name;
                     server.url = s.url;
                     config.servers.add(server);
@@ -167,7 +151,7 @@ public class SubMenuActivity extends AppCompatActivity {
         } else if (channel.stream != null) {
             config.url = channel.stream.url;
             if (channel.stream.userAgent != null || channel.stream.referrer != null) {
-                config.headers = new com.apix.app.StreamConfig.Headers();
+                config.headers = new StreamConfig.Headers();
                 config.headers.userAgent = channel.stream.userAgent;
                 config.headers.referer = channel.stream.referrer;
                 config.headers.cookie = channel.stream.cookies;

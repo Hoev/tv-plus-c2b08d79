@@ -18,9 +18,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
 /**
- * Adapter for channel cards (grid layout)
- * 16:9 aspect ratio cards with name overlay at bottom-left
- * Strong gold focus effect for TV remote navigation
+ * Channel cards with 16:9 aspect ratio, name overlay at bottom-left
+ * Touch + focus effects for both phone and TV
  */
 public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHolder> {
 
@@ -31,6 +30,8 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
     private Context context;
     private List<FirebaseModels.Channel> data;
     private OnChannelClick listener;
+
+    private static final int GOLD = Color.parseColor("#FFD700");
 
     public ChannelAdapter(Context ctx, List<FirebaseModels.Channel> data, OnChannelClick listener) {
         this.context = ctx;
@@ -55,7 +56,7 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
         FirebaseModels.Channel channel = data.get(position);
         holder.name.setText(channel.name);
 
-        // Force 16:9 aspect ratio on image container
+        // Force 16:9 aspect ratio
         holder.imageContainer.getViewTreeObserver().addOnPreDrawListener(
             new ViewTreeObserver.OnPreDrawListener() {
                 @Override
@@ -81,29 +82,50 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
 
         holder.itemView.setOnClickListener(v -> listener.onClick(channel));
 
-        // TV D-pad focus handling with strong gold glow
+        // Touch effect for phones - pressed state
+        holder.itemView.setClickable(true);
         holder.itemView.setFocusable(true);
+
+        // Focus/touch visual feedback - gold border + scale for both phone and TV
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start();
-                v.setElevation(16f);
-                holder.card.setCardElevation(12f);
-                // Gold outline
-                GradientDrawable glow = new GradientDrawable();
-                glow.setCornerRadius(16f);
-                glow.setStroke(5, Color.parseColor("#FFD700"));
-                glow.setColor(Color.TRANSPARENT);
-                v.setForeground(glow);
-                // Make name gold on focus
-                holder.name.setTextColor(Color.parseColor("#FFD700"));
-            } else {
-                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
-                v.setElevation(0f);
-                holder.card.setCardElevation(4f);
-                v.setForeground(null);
-                holder.name.setTextColor(Color.WHITE);
-            }
+            applyFocusEffect(v, holder, hasFocus);
         });
+
+        // Touch feedback for phones
+        holder.itemView.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    applyFocusEffect(v, holder, true);
+                    break;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    applyFocusEffect(v, holder, false);
+                    break;
+            }
+            return false; // Don't consume - let click handler work
+        });
+    }
+
+    private void applyFocusEffect(View v, ViewHolder holder, boolean focused) {
+        if (focused) {
+            v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start();
+            v.setElevation(16f);
+            holder.card.setCardElevation(12f);
+            // Gold border
+            GradientDrawable glow = new GradientDrawable();
+            glow.setCornerRadius(16f);
+            glow.setStroke(4, GOLD);
+            glow.setColor(Color.TRANSPARENT);
+            v.setForeground(glow);
+            // Gold name
+            holder.name.setTextColor(GOLD);
+        } else {
+            v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
+            v.setElevation(0f);
+            holder.card.setCardElevation(4f);
+            v.setForeground(null);
+            holder.name.setTextColor(Color.WHITE);
+        }
     }
 
     @Override

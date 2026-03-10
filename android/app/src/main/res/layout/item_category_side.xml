@@ -6,27 +6,30 @@
     android:gravity="center_vertical"
     android:paddingStart="20dp"
     android:paddingEnd="20dp"
-    android:paddingTop="14dp"
-    android:paddingBottom="14dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="16dp"
+    android:layout_marginStart="12dp"
+    android:layout_marginEnd="12dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
     android:focusable="true"
-    android:clickable="true"
-    android:background="@drawable/btn_text_focus_selector">
+    android:clickable="true">
 
-    <!-- Active indicator (gold bar on left) -->
+    <!-- Active indicator - hidden in side mode, we use bg color instead -->
     <View
         android:id="@+id/category_indicator"
         android:layout_width="4dp"
         android:layout_height="24dp"
         android:layout_marginEnd="12dp"
         android:background="@color/gold_accent"
-        android:visibility="invisible" />
+        android:visibility="gone" />
 
     <!-- Category Icon -->
     <ImageView
         android:id="@+id/category_icon"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:layout_marginEnd="10dp"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_marginEnd="12dp"
         android:tint="@color/white"
         android:contentDescription="Icon" />
 
@@ -38,6 +41,7 @@
         android:textColor="@color/white"
         android:textSize="16sp"
         android:textStyle="bold"
+        android:textAllCaps="true"
         android:maxLines="1"
         android:ellipsize="end" />
 
