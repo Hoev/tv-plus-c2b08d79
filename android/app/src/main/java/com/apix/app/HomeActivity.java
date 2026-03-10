@@ -3,6 +3,7 @@ package com.apix.app;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,9 +23,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -38,16 +36,19 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.gson.Gson;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * Native Home Activity with responsive layout + search:
- * - Portrait: Bottom nav bar with icons, channels grid above, search icon in header
- * - Landscape/TV: Side nav with icons, channels grid on right, search icon in top bar
+ * Native Home Activity - matches website design exactly
+ * Portrait: bottom nav with icons, 2-col channels, APiX header + search
+ * Landscape/TV: right sidebar with APiX logo + categories, clock + search top center, 2-col channels
  */
 public class HomeActivity extends AppCompatActivity {
 
@@ -64,6 +65,7 @@ public class HomeActivity extends AppCompatActivity {
     private RecyclerView categoriesRecyclerLandscape;
     private RecyclerView channelsRecyclerLandscape;
     private TextView categoryTitleLandscape;
+    private TextView clockText;
 
     // Search
     private LinearLayout searchOverlay;
@@ -82,10 +84,8 @@ public class HomeActivity extends AppCompatActivity {
     private Map<String, FirebaseModels.SideMenu> sideMenus = new HashMap<>();
     private FirebaseModels.Category selectedCategory;
 
-    // All channels flat list for search
     private List<FirebaseModels.Channel> allChannels = new ArrayList<>();
 
-    // Adapters for both modes
     private CategoryAdapter categoryAdapterPortrait;
     private CategoryAdapter categoryAdapterLandscape;
     private ChannelAdapter channelAdapterPortrait;
@@ -94,28 +94,39 @@ public class HomeActivity extends AppCompatActivity {
 
     private boolean isLandscape = false;
 
+    // Clock updater
+    private Handler clockHandler = new Handler(Looper.getMainLooper());
+    private Runnable clockRunnable;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        enableFullscreen();
+        // NO fullscreen in home - let system bars show normally
+        // Fullscreen is only for PlayerActivity
+
         initViews();
         initFirebase();
         loadData();
+        startClock();
     }
 
-    private void enableFullscreen() {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(
-            getWindow(), getWindow().getDecorView());
-        controller.hide(WindowInsetsCompat.Type.systemBars());
-        controller.setSystemBarsBehavior(
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+    private void startClock() {
+        clockRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (clockText != null) {
+                    SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                    clockText.setText(sdf.format(new Date()));
+                }
+                clockHandler.postDelayed(this, 30000);
+            }
+        };
+        clockHandler.post(clockRunnable);
     }
 
     private void initViews() {
-        // Common
         loadingBar = findViewById(R.id.loading_bar);
         errorLayout = findViewById(R.id.error_layout);
         errorText = findViewById(R.id.error_text);
@@ -131,6 +142,7 @@ public class HomeActivity extends AppCompatActivity {
         categoriesRecyclerLandscape = findViewById(R.id.categories_recycler_landscape);
         channelsRecyclerLandscape = findViewById(R.id.channels_recycler_landscape);
         categoryTitleLandscape = findViewById(R.id.category_title_landscape);
+        clockText = findViewById(R.id.clock_text);
 
         // Search
         searchOverlay = findViewById(R.id.search_overlay);
@@ -146,7 +158,6 @@ public class HomeActivity extends AppCompatActivity {
         searchBtnLandscape.setOnClickListener(v -> showSearch());
         searchCancel.setOnClickListener(v -> hideSearch());
 
-        // Search input listener
         searchInput.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 performSearch(searchInput.getText().toString());
@@ -163,16 +174,16 @@ public class HomeActivity extends AppCompatActivity {
             }
         });
 
-        // Search results adapter
+        // Search results
         searchAdapter = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         int searchSpan = getResources().getConfiguration().orientation ==
-            Configuration.ORIENTATION_LANDSCAPE ? 4 : 2;
+            Configuration.ORIENTATION_LANDSCAPE ? 2 : 2;
         searchResultsRecycler.setLayoutManager(new GridLayoutManager(this, searchSpan));
         searchResultsRecycler.setAdapter(searchAdapter);
 
-        // Setup portrait adapters (horizontal categories at bottom)
+        // Portrait: bottom nav horizontal, reversed for RTL feel (first from right)
         categoriesRecyclerPortrait.setLayoutManager(
-            new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+            new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, true));
         categoryAdapterPortrait = new CategoryAdapter(this, categories, this::onCategorySelected);
         categoryAdapterPortrait.setSideMode(false);
         categoriesRecyclerPortrait.setAdapter(categoryAdapterPortrait);
@@ -181,18 +192,17 @@ public class HomeActivity extends AppCompatActivity {
         channelAdapterPortrait = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         channelsRecyclerPortrait.setAdapter(channelAdapterPortrait);
 
-        // Setup landscape adapters (vertical categories on side)
+        // Landscape: vertical side categories, 2 columns for bigger cards
         categoriesRecyclerLandscape.setLayoutManager(
             new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
         categoryAdapterLandscape = new CategoryAdapter(this, categories, this::onCategorySelected);
         categoryAdapterLandscape.setSideMode(true);
         categoriesRecyclerLandscape.setAdapter(categoryAdapterLandscape);
 
-        channelsRecyclerLandscape.setLayoutManager(new GridLayoutManager(this, 4));
+        channelsRecyclerLandscape.setLayoutManager(new GridLayoutManager(this, 2));
         channelAdapterLandscape = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         channelsRecyclerLandscape.setAdapter(channelAdapterLandscape);
 
-        // Apply initial layout
         applyLayout();
     }
 
@@ -225,7 +235,6 @@ public class HomeActivity extends AppCompatActivity {
             }
         }
 
-        // Also search sub-menus
         for (FirebaseModels.SideMenu menu : sideMenus.values()) {
             if (menu.channels != null) {
                 for (FirebaseModels.SubChannel sc : menu.channels.values()) {
@@ -263,11 +272,9 @@ public class HomeActivity extends AppCompatActivity {
     private void onCategorySelected(FirebaseModels.Category category) {
         selectedCategory = category;
 
-        // Update both layouts
         categoryTitlePortrait.setText(category.name);
         categoryTitleLandscape.setText(category.name);
 
-        // Sync selection on both adapters
         int pos = categories.indexOf(category);
         if (pos >= 0) {
             categoryAdapterPortrait.setSelected(pos);
@@ -327,7 +334,6 @@ public class HomeActivity extends AppCompatActivity {
 
                 Collections.sort(categories, (a, b) -> a.sortOrder - b.sortOrder);
 
-                // Update both adapters
                 categoryAdapterPortrait.updateData(categories);
                 categoryAdapterLandscape.updateData(categories);
 
@@ -385,7 +391,6 @@ public class HomeActivity extends AppCompatActivity {
 
         Collections.sort(channels, (a, b) -> a.sortOrder - b.sortOrder);
 
-        // Update both adapters
         channelAdapterPortrait.updateData(channels);
         channelAdapterLandscape.updateData(channels);
     }
@@ -393,7 +398,6 @@ public class HomeActivity extends AppCompatActivity {
     private void onChannelClick(FirebaseModels.Channel channel) {
         if (channel == null) return;
 
-        // Hide search if open
         if (searchOverlay.getVisibility() == View.VISIBLE) {
             hideSearch();
         }
@@ -547,11 +551,18 @@ public class HomeActivity extends AppCompatActivity {
         super.onConfigurationChanged(newConfig);
         applyLayout();
 
-        // Refresh data in active layout
         if (!categories.isEmpty()) {
             categoryAdapterPortrait.updateData(categories);
             categoryAdapterLandscape.updateData(categories);
             updateChannels();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (clockHandler != null && clockRunnable != null) {
+            clockHandler.removeCallbacks(clockRunnable);
         }
     }
 }
