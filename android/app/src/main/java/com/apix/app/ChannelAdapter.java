@@ -20,6 +20,7 @@ import java.util.List;
 /**
  * Channel cards with 16:9 aspect ratio, name overlay at bottom-left
  * Touch + focus effects for both phone and TV
+ * Focus effect: darker overlay + rounded gold border (matching website)
  */
 public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHolder> {
 
@@ -82,50 +83,51 @@ public class ChannelAdapter extends RecyclerView.Adapter<ChannelAdapter.ViewHold
 
         holder.itemView.setOnClickListener(v -> listener.onClick(channel));
 
-        // Touch effect for phones - pressed state
         holder.itemView.setClickable(true);
         holder.itemView.setFocusable(true);
 
-        // Focus/touch visual feedback - gold border + scale for both phone and TV
+        // Focus effect for D-pad (TV remote)
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
-            applyFocusEffect(v, holder, hasFocus);
+            applyFocusEffect(holder, hasFocus);
         });
 
         // Touch feedback for phones
         holder.itemView.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case android.view.MotionEvent.ACTION_DOWN:
-                    applyFocusEffect(v, holder, true);
+                    applyFocusEffect(holder, true);
                     break;
                 case android.view.MotionEvent.ACTION_UP:
                 case android.view.MotionEvent.ACTION_CANCEL:
-                    applyFocusEffect(v, holder, false);
+                    applyFocusEffect(holder, false);
                     break;
             }
-            return false; // Don't consume - let click handler work
+            return false;
         });
     }
 
-    private void applyFocusEffect(View v, ViewHolder holder, boolean focused) {
+    private void applyFocusEffect(ViewHolder holder, boolean focused) {
         if (focused) {
-            v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start();
-            v.setElevation(16f);
-            holder.card.setCardElevation(12f);
-            // Gold border
-            GradientDrawable glow = new GradientDrawable();
-            glow.setCornerRadius(16f);
-            glow.setStroke(4, GOLD);
-            glow.setColor(Color.TRANSPARENT);
-            v.setForeground(glow);
+            holder.itemView.animate().scaleX(1.04f).scaleY(1.04f).setDuration(150).start();
+            // Rounded gold border on the CardView
+            holder.card.setCardElevation(10f);
+            GradientDrawable border = new GradientDrawable();
+            border.setCornerRadius(dpToPx(12));
+            border.setStroke(dpToPx(2.5f), GOLD);
+            border.setColor(Color.TRANSPARENT);
+            holder.itemView.setForeground(border);
             // Gold name
             holder.name.setTextColor(GOLD);
         } else {
-            v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
-            v.setElevation(0f);
+            holder.itemView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
             holder.card.setCardElevation(4f);
-            v.setForeground(null);
+            holder.itemView.setForeground(null);
             holder.name.setTextColor(Color.WHITE);
         }
+    }
+
+    private int dpToPx(float dp) {
+        return (int) (dp * context.getResources().getDisplayMetrics().density);
     }
 
     @Override
