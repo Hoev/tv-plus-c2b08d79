@@ -65,15 +65,8 @@ import java.util.Map;
 
 /**
  * Native ExoPlayer Activity with Gold & Black theme
- * Features:
- * - HLS, DASH, MP4 support with proper URL handling
- * - Custom headers (User-Agent, Referer, Cookie)
- * - Full Widevine/ClearKey DRM support (including combined KeyID:Key format)
- * - Multi-Server selection
- * - Track selection dialog (sorted by resolution)
- * - Aspect ratio cycling
- * - Picture-in-Picture (Android O+)
- * - TV Remote navigation
+ * Full MPD/DASH reliability: proper player cleanup between streams,
+ * isolated error handling, and robust format detection.
  */
 @OptIn(markerClass = UnstableApi.class)
 public class PlayerActivity extends AppCompatActivity {
@@ -88,8 +81,8 @@ public class PlayerActivity extends AppCompatActivity {
     private int currentServerIndex = 0;
     
     // Track selection state
-    private int selectedVideoTrackIndex = -1; // -1 = Auto
-    private int selectedAudioTrackIndex = -1; // -1 = Auto
+    private int selectedVideoTrackIndex = -1;
+    private int selectedAudioTrackIndex = -1;
     
     // Aspect ratio modes
     private int currentResizeMode = 0;
@@ -104,10 +97,8 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Start security monitor before loading any stream
         SecurityMonitor.getInstance(this).startMonitor();
         
-        // Force landscape and fullscreen
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         enableFullscreen();
         
@@ -115,7 +106,6 @@ public class PlayerActivity extends AppCompatActivity {
         
         playerView = findViewById(R.id.playerView);
         
-        // Parse stream config from intent
         String configJson = getIntent().getStringExtra("streamConfig");
         if (configJson == null || configJson.isEmpty()) {
             Toast.makeText(this, "No stream configuration provided", Toast.LENGTH_SHORT).show();
@@ -128,7 +118,6 @@ public class PlayerActivity extends AppCompatActivity {
             Log.d(TAG, "Stream URL: " + streamConfig.url);
             Log.d(TAG, "Has headers: " + streamConfig.hasHeaders());
             Log.d(TAG, "Has DRM: " + streamConfig.hasDrm());
-            Log.d(TAG, "Has servers: " + streamConfig.hasServers());
         } catch (Exception e) {
             Log.e(TAG, "Failed to parse stream config", e);
             Toast.makeText(this, "Invalid stream configuration", Toast.LENGTH_SHORT).show();
@@ -154,37 +143,21 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void setupUI() {
-        // Back/Exit button
         ImageButton backButton = playerView.findViewById(R.id.exo_back);
-        if (backButton != null) {
-            backButton.setOnClickListener(v -> finish());
-        }
+        if (backButton != null) backButton.setOnClickListener(v -> finish());
         
-        // Resize button
         ImageButton resizeButton = playerView.findViewById(R.id.exo_resize);
-        if (resizeButton != null) {
-            resizeButton.setOnClickListener(v -> cycleResizeMode());
-        }
+        if (resizeButton != null) resizeButton.setOnClickListener(v -> cycleResizeMode());
         
-        // PiP button
         ImageButton pipButton = playerView.findViewById(R.id.exo_pip);
-        if (pipButton != null) {
-            pipButton.setOnClickListener(v -> enterPiPMode());
-        }
+        if (pipButton != null) pipButton.setOnClickListener(v -> enterPiPMode());
         
-        // Settings button - Track selection
         ImageButton settingsButton = playerView.findViewById(R.id.exo_settings);
-        if (settingsButton != null) {
-            settingsButton.setOnClickListener(v -> showTrackSelectionDialog());
-        }
+        if (settingsButton != null) settingsButton.setOnClickListener(v -> showTrackSelectionDialog());
         
-        // Subtitle button - Show subtitle selection
         ImageButton subtitleButton = playerView.findViewById(R.id.exo_subtitle);
-        if (subtitleButton != null) {
-            subtitleButton.setOnClickListener(v -> showSubtitleSelectionDialog());
-        }
+        if (subtitleButton != null) subtitleButton.setOnClickListener(v -> showSubtitleSelectionDialog());
         
-        // Server button - Multi-server selection (only show if servers available)
         ImageButton serverButton = playerView.findViewById(R.id.exo_server);
         if (serverButton != null) {
             if (streamConfig.hasServers() && streamConfig.servers.size() > 1) {
@@ -229,7 +202,6 @@ public class PlayerActivity extends AppCompatActivity {
             .setTitle("Subtitles")
             .setItems(options, (dialog, which) -> {
                 if (which == 0) {
-                    // Disable subtitles
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
@@ -266,10 +238,7 @@ public class PlayerActivity extends AppCompatActivity {
                 enterPictureInPictureMode(params);
             } catch (Exception e) {
                 Log.e(TAG, "PiP failed", e);
-                Toast.makeText(this, "PiP not available", Toast.LENGTH_SHORT).show();
             }
-        } else {
-            Toast.makeText(this, "PiP requires Android 8.0+", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -279,9 +248,6 @@ public class PlayerActivity extends AppCompatActivity {
         playerView.setUseController(!isInPictureInPictureMode);
     }
 
-    /**
-     * Show Multi-Server Selection Dialog
-     */
     private void showServerSelectionDialog() {
         if (!streamConfig.hasServers()) return;
         
@@ -296,7 +262,6 @@ public class PlayerActivity extends AppCompatActivity {
         
         RadioGroup radioGroup = dialog.findViewById(R.id.server_radio_group);
         
-        // Populate servers
         for (int i = 0; i < streamConfig.servers.size(); i++) {
             StreamConfig.Server server = streamConfig.servers.get(i);
             RadioButton rb = new RadioButton(this);
@@ -341,19 +306,11 @@ public class PlayerActivity extends AppCompatActivity {
         
         Toast.makeText(this, "Switching to: " + (server.name != null ? server.name : "Server " + (index + 1)), Toast.LENGTH_SHORT).show();
         
-        // Reinitialize player with new source
-        if (player != null) {
-            long position = player.getCurrentPosition();
-            player.release();
-            initializePlayer();
-            player.seekTo(position);
-        }
+        // CRITICAL: Fully release old player before creating new one
+        releasePlayer();
+        initializePlayer();
     }
 
-    /**
-     * Show Track Selection Dialog with VIDEO/AUDIO tabs
-     * Dark theme with gold accents, sorted by resolution (highest first)
-     */
     private void showTrackSelectionDialog() {
         if (player == null) return;
         
@@ -362,7 +319,6 @@ public class PlayerActivity extends AppCompatActivity {
         dialog.setContentView(R.layout.dialog_track_selection);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         
-        // Calculate dialog size - width 60%, height max 75% of screen
         int dialogWidth = (int)(getResources().getDisplayMetrics().widthPixels * 0.6);
         int maxDialogHeight = (int)(getResources().getDisplayMetrics().heightPixels * 0.75);
         
@@ -378,14 +334,12 @@ public class PlayerActivity extends AppCompatActivity {
         Button btnCancel = dialog.findViewById(R.id.btn_cancel);
         Button btnOk = dialog.findViewById(R.id.btn_ok);
         
-        // Set indicator width to half
         tabIndicator.post(() -> {
             ViewGroup.LayoutParams params = tabIndicator.getLayoutParams();
             params.width = tabVideo.getWidth();
             tabIndicator.setLayoutParams(params);
         });
         
-        // Collect tracks
         Tracks tracks = player.getCurrentTracks();
         List<TrackInfo> videoTracks = new ArrayList<>();
         List<TrackInfo> audioTracks = new ArrayList<>();
@@ -414,18 +368,14 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
         
-        // Sort video tracks by resolution (highest first)
         Collections.sort(videoTracks, (a, b) -> {
             if (b.height != a.height) return b.height - a.height;
             return b.bitrate - a.bitrate;
         });
         
-        // Populate video tracks (dark theme - white text)
-        // Add "None" option
         RadioButton rbNone = createDarkRadioButton("None", -2, selectedVideoTrackIndex == -2);
         videoRadioGroup.addView(rbNone);
         
-        // Add "Auto" option
         RadioButton rbAuto = createDarkRadioButton("Auto", -1, selectedVideoTrackIndex == -1);
         audioRadioGroup.addView(rbAuto);
         
@@ -436,7 +386,6 @@ public class PlayerActivity extends AppCompatActivity {
             videoRadioGroup.addView(rb);
         }
         
-        // Populate audio tracks (dark theme - white text)
         RadioButton rbAudioAuto = createDarkRadioButton("Auto", -1, selectedAudioTrackIndex == -1);
         audioRadioGroup.addView(rbAudioAuto);
         
@@ -447,7 +396,6 @@ public class PlayerActivity extends AppCompatActivity {
             audioRadioGroup.addView(rb);
         }
         
-        // Tab switching with gold animation
         final List<TrackInfo> finalVideoTracks = videoTracks;
         final List<TrackInfo> finalAudioTracks = audioTracks;
         
@@ -470,7 +418,6 @@ public class PlayerActivity extends AppCompatActivity {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         
         btnOk.setOnClickListener(v -> {
-            // Apply video track selection
             int videoCheckedId = videoRadioGroup.getCheckedRadioButtonId();
             if (videoCheckedId != -1) {
                 RadioButton videoRb = dialog.findViewById(videoCheckedId);
@@ -478,14 +425,12 @@ public class PlayerActivity extends AppCompatActivity {
                 selectedVideoTrackIndex = index;
                 
                 if (index == -2) {
-                    // Disable video
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
                             .build()
                     );
                 } else if (index == -1) {
-                    // Auto
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
@@ -505,7 +450,6 @@ public class PlayerActivity extends AppCompatActivity {
                 }
             }
             
-            // Apply audio track selection
             int audioCheckedId = audioRadioGroup.getCheckedRadioButtonId();
             if (audioCheckedId != -1) {
                 RadioButton audioRb = dialog.findViewById(audioCheckedId);
@@ -513,7 +457,6 @@ public class PlayerActivity extends AppCompatActivity {
                 selectedAudioTrackIndex = index;
                 
                 if (index == -1) {
-                    // Auto
                     trackSelector.setParameters(
                         trackSelector.buildUponParameters()
                             .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
@@ -537,9 +480,6 @@ public class PlayerActivity extends AppCompatActivity {
         dialog.show();
     }
     
-    /**
-     * Create a radio button with dark theme styling (white text on dark background)
-     */
     private RadioButton createDarkRadioButton(String text, int index, boolean checked) {
         RadioButton rb = new RadioButton(this);
         rb.setId(View.generateViewId());
@@ -578,10 +518,9 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void initializePlayer() {
-        // Build data source factory with custom headers
+        // CRITICAL: Always create fresh instances - never reuse stale player/trackSelector
         DataSource.Factory dataSourceFactory = buildDataSourceFactory();
         
-        // Create track selector
         trackSelector = new DefaultTrackSelector(this);
         trackSelector.setParameters(
             trackSelector.buildUponParameters()
@@ -589,29 +528,37 @@ public class PlayerActivity extends AppCompatActivity {
                 .build()
         );
         
-        // Build player
         player = new ExoPlayer.Builder(this)
             .setTrackSelector(trackSelector)
             .build();
         
         playerView.setPlayer(player);
         
-        // Add listener
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
-                Log.e(TAG, "Playback error: " + error.getMessage(), error);
+                Log.e(TAG, "Playback error: " + error.getMessage() + " code=" + error.errorCode, error);
                 String errorMsg = "Playback error";
-                if (error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) {
+                
+                int code = error.errorCode;
+                if (code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) {
                     errorMsg = "Network error";
-                } else if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
-                    errorMsg = "Stream unavailable";
-                } else if (error.errorCode == PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED) {
+                } else if (code == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+                    errorMsg = "Stream unavailable (HTTP error)";
+                } else if (code == PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED) {
                     errorMsg = "DRM license failed";
-                } else if (error.errorCode == PlaybackException.ERROR_CODE_DRM_SCHEME_UNSUPPORTED) {
+                } else if (code == PlaybackException.ERROR_CODE_DRM_SCHEME_UNSUPPORTED) {
                     errorMsg = "DRM not supported";
+                } else if (code == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED) {
+                    errorMsg = "Invalid stream format";
+                } else if (code == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+                           code == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) {
+                    errorMsg = "Unsupported stream format";
                 }
+                
                 Toast.makeText(PlayerActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                
+                // Don't auto-finish - let user try server switch or back out manually
             }
             
             @Override
@@ -626,10 +573,10 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         
-        // Build media source async (ClearKey API fetch needs background thread)
+        // Build media source async (ClearKey may need network)
         buildMediaSourceAsync(dataSourceFactory, mediaSource -> {
             runOnUiThread(() -> {
-                if (player != null) {
+                if (player != null && !isFinishing()) {
                     player.setMediaSource(mediaSource);
                     player.prepare();
                     player.setPlayWhenReady(true);
@@ -643,7 +590,6 @@ public class PlayerActivity extends AppCompatActivity {
     }
     
     private void buildMediaSourceAsync(DataSource.Factory factory, MediaSourceCallback callback) {
-        // If no DRM or no ClearKey API needed, build synchronously
         if (!streamConfig.hasDrm() || streamConfig.drm == null) {
             callback.onReady(buildMediaSource(factory, null));
             return;
@@ -653,15 +599,19 @@ public class PlayerActivity extends AppCompatActivity {
             streamConfig.drm.scheme.toLowerCase() : "clearkey";
         
         if (!"clearkey".equals(scheme)) {
-            // Widevine/PlayReady don't need API fetch
             callback.onReady(buildMediaSource(factory, null));
             return;
         }
         
-        // ClearKey: may need API fetch on background thread
         new Thread(() -> {
-            String resolvedClearKeyJson = resolveClearKey();
-            callback.onReady(buildMediaSource(factory, resolvedClearKeyJson));
+            try {
+                String resolvedClearKeyJson = resolveClearKey();
+                callback.onReady(buildMediaSource(factory, resolvedClearKeyJson));
+            } catch (Exception e) {
+                Log.e(TAG, "ClearKey resolution failed", e);
+                // Still try to build without ClearKey
+                callback.onReady(buildMediaSource(factory, null));
+            }
         }).start();
     }
     
@@ -765,7 +715,6 @@ public class PlayerActivity extends AppCompatActivity {
 
     /**
      * Build MediaSource with optional pre-resolved ClearKey JSON
-     * @param resolvedClearKeyJson pre-fetched ClearKey JSON (from background thread), or null
      */
     private MediaSource buildMediaSource(DataSource.Factory dataSourceFactory, String resolvedClearKeyJson) {
         String url = streamConfig.url;
@@ -774,6 +723,16 @@ public class PlayerActivity extends AppCompatActivity {
         Uri uri = Uri.parse(url);
         
         MediaItem.Builder mediaItemBuilder = new MediaItem.Builder().setUri(uri);
+        
+        // Detect format FIRST - needed for MIME type hint
+        String format = detectStreamFormat(url);
+        
+        // Set MIME type hint to help ExoPlayer with ambiguous URLs
+        if ("dash".equals(format)) {
+            mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD);
+        } else if ("hls".equals(format)) {
+            mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8);
+        }
         
         if (streamConfig.hasDrm() && streamConfig.drm != null) {
             String scheme = streamConfig.drm.scheme != null ? 
@@ -812,7 +771,7 @@ public class PlayerActivity extends AppCompatActivity {
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                 }
             } else {
-                // ClearKey - use pre-resolved JSON from background thread
+                // ClearKey
                 drmBuilder = new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID);
                 
                 if (resolvedClearKeyJson != null) {
@@ -821,7 +780,6 @@ public class PlayerActivity extends AppCompatActivity {
                     drmBuilder.setLicenseUri(dataUri);
                     Log.d(TAG, "ClearKey: Applied pre-resolved JSON");
                 } else if (streamConfig.drm.licenseUrl != null && !streamConfig.drm.licenseUrl.isEmpty()) {
-                    // Fallback: pass license URL directly
                     drmBuilder.setLicenseUri(streamConfig.drm.licenseUrl);
                     Log.d(TAG, "ClearKey: Passing license URL directly as fallback");
                 }
@@ -831,9 +789,6 @@ public class PlayerActivity extends AppCompatActivity {
         }
         
         MediaItem mediaItem = mediaItemBuilder.build();
-        
-        // Detect format
-        String format = detectStreamFormat(url);
         
         if ("hls".equals(format)) {
             Log.d(TAG, "Building HLS source");
@@ -853,42 +808,45 @@ public class PlayerActivity extends AppCompatActivity {
     
     /**
      * Smart stream format detection that handles complex URLs with tokens,
-     * query parameters, fragments, and CDN paths
+     * query parameters, fragments, and CDN paths.
+     * IMPORTANT: Must handle URLs like:
+     *   .../file.mpd?token=abc&params=xyz
+     *   .../PLTV/86/224/.../file.mpd?accountinfo=...
      */
     private String detectStreamFormat(String url) {
         if (url == null || url.isEmpty()) return "progressive";
         
         String lower = url.toLowerCase();
         
-        // 1. Check path extension (before query string and fragment)
-        try {
-            Uri uri = Uri.parse(url);
-            String path = uri.getPath();
-            if (path != null) {
-                path = path.toLowerCase();
-                if (path.endsWith(".m3u8")) return "hls";
-                if (path.endsWith(".mpd")) return "dash";
-                if (path.endsWith(".mp4") || path.endsWith(".mkv") || 
-                    path.endsWith(".webm") || path.endsWith(".ts")) return "progressive";
-            }
-        } catch (Exception ignored) {}
+        // 1. Extract path before query string
+        String path = lower;
+        int queryIdx = lower.indexOf('?');
+        if (queryIdx > 0) {
+            path = lower.substring(0, queryIdx);
+        }
+        int fragIdx = path.indexOf('#');
+        if (fragIdx > 0) {
+            path = path.substring(0, fragIdx);
+        }
         
-        // 2. Check for format extensions anywhere in URL (handles complex query params)
-        // Match .mpd or .m3u8 followed by ? or end or other non-alpha char
-        if (lower.matches(".*\\.m3u8([?#&,;].*)?$") || lower.contains(".m3u8?") || 
-            lower.contains(".m3u8&") || lower.contains("/hls/") || 
-            lower.contains("format=m3u8") || lower.contains("type=hls")) return "hls";
-        if (lower.matches(".*\\.mpd([?#&,;].*)?$") || lower.contains(".mpd?") || 
-            lower.contains(".mpd&") || lower.contains("/dash/") || 
-            lower.contains("format=mpd") || lower.contains("type=dash") ||
-            lower.contains("manifest(format=mpd") || lower.contains("output=mpd") ||
-            lower.contains("/pltv/")) return "dash";
+        // 2. Check path extension directly
+        if (path.endsWith(".m3u8")) return "hls";
+        if (path.endsWith(".mpd")) return "dash";
+        if (path.endsWith(".mp4") || path.endsWith(".mkv") || 
+            path.endsWith(".webm") || path.endsWith(".ts")) return "progressive";
         
-        // 3. Broad keyword check
+        // 3. Check for format hints anywhere in the full URL
         if (lower.contains(".m3u8")) return "hls";
         if (lower.contains(".mpd")) return "dash";
         
-        // 4. Content-type hints
+        // 4. Path-based hints
+        if (lower.contains("/hls/") || lower.contains("format=m3u8") || 
+            lower.contains("type=hls")) return "hls";
+        if (lower.contains("/dash/") || lower.contains("format=mpd") || 
+            lower.contains("type=dash") || lower.contains("manifest(format=mpd") || 
+            lower.contains("output=mpd") || lower.contains("/pltv/")) return "dash";
+        
+        // 5. Content-type hints
         if (lower.contains("application/x-mpegurl") || lower.contains("vnd.apple.mpegurl")) return "hls";
         if (lower.contains("application/dash+xml")) return "dash";
         
@@ -897,17 +855,18 @@ public class PlayerActivity extends AppCompatActivity {
     
     /**
      * Fetch ClearKey JSON from an API endpoint
-     * Supports responses in standard ClearKey format or custom formats
      */
     private String fetchClearKeyFromApi(String apiUrl) {
+        java.net.HttpURLConnection conn = null;
         try {
             Log.d(TAG, "Fetching ClearKey from: " + apiUrl);
             java.net.URL url = new java.net.URL(apiUrl);
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn = (java.net.HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            conn.setInstanceFollowRedirects(true);
             
             int responseCode = conn.getResponseCode();
             Log.d(TAG, "ClearKey API response code: " + responseCode);
@@ -925,19 +884,18 @@ public class PlayerActivity extends AppCompatActivity {
                 String body = response.toString().trim();
                 Log.d(TAG, "ClearKey API response: " + body);
                 
-                // Check if it's already a valid ClearKey JSON (has "keys" array)
+                // Already valid ClearKey JSON
                 if (body.contains("\"keys\"") && body.contains("\"kty\"")) {
                     return body;
                 }
                 
-                // Try to parse as JSON with keyId/key fields
+                // Try JSON with keyId/key fields
                 try {
                     com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
                     
                     String keyId = null;
                     String key = null;
                     
-                    // Try various field names
                     String[] keyIdNames = {"keyid", "keyId", "key_id", "kid", "KID"};
                     String[] keyNames = {"key", "Key", "KEY", "k"};
                     
@@ -964,7 +922,7 @@ public class PlayerActivity extends AppCompatActivity {
                     Log.w(TAG, "ClearKey API response not JSON: " + e.getMessage());
                 }
                 
-                // Try to parse as "keyId:key" plain text
+                // Plain text "keyId:key"
                 if (body.contains(":") && !body.contains("{")) {
                     String[] parts = body.split(":");
                     if (parts.length == 2) {
@@ -976,9 +934,12 @@ public class PlayerActivity extends AppCompatActivity {
                     }
                 }
             }
-            conn.disconnect();
         } catch (Exception e) {
             Log.e(TAG, "Failed to fetch ClearKey from API: " + e.getMessage());
+        } finally {
+            if (conn != null) {
+                try { conn.disconnect(); } catch (Exception ignored) {}
+            }
         }
         return null;
     }
@@ -1004,6 +965,18 @@ public class PlayerActivity extends AppCompatActivity {
         }
         
         return Base64.encodeToString(data, Base64.NO_WRAP | Base64.URL_SAFE | Base64.NO_PADDING);
+    }
+
+    /** Fully release the player and all associated resources */
+    private void releasePlayer() {
+        if (player != null) {
+            player.stop();
+            player.clearMediaItems();
+            player.release();
+            player = null;
+        }
+        trackSelector = null;
+        playerView.setPlayer(null);
     }
 
     @Override
@@ -1033,10 +1006,7 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (player != null) {
-            player.release();
-            player = null;
-        }
+        releasePlayer();
     }
     
     @Override

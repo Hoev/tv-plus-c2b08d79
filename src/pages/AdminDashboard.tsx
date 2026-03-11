@@ -75,7 +75,7 @@ const AdminDashboard: React.FC = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
         <Tabs defaultValue="categories" className="space-y-6">
-          <TabsList className="bg-secondary border border-border flex-wrap">
+          <TabsList className="bg-secondary border border-border w-full overflow-x-auto flex-nowrap justify-start">
             <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Folder className="w-4 h-4 mr-2" />
               الأقسام

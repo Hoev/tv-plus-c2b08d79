@@ -4,18 +4,18 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="20dp"
-    android:paddingEnd="20dp"
-    android:paddingTop="16dp"
-    android:paddingBottom="16dp"
-    android:layout_marginStart="12dp"
-    android:layout_marginEnd="12dp"
-    android:layout_marginTop="4dp"
-    android:layout_marginBottom="4dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginTop="3dp"
+    android:layout_marginBottom="3dp"
     android:focusable="true"
     android:clickable="true">
 
-    <!-- Active indicator - hidden in side mode, we use bg color instead -->
+    <!-- Active indicator - hidden in side mode -->
     <View
         android:id="@+id/category_indicator"
         android:layout_width="4dp"
@@ -27,9 +27,9 @@
     <!-- Category Icon -->
     <ImageView
         android:id="@+id/category_icon"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
-        android:layout_marginEnd="12dp"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="10dp"
         android:tint="@color/white"
         android:contentDescription="Icon" />
 
@@ -39,7 +39,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textColor="@color/white"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:textStyle="bold"
         android:textAllCaps="true"
         android:maxLines="1"

@@ -18,9 +18,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Category tabs with icons - matches website design
- * Side mode: full gold background on selected (like website TV sidebar)
- * Bottom mode: gold text + indicator line
+ * Category tabs with icons
+ * Side mode: selected = gold bg, focused (not selected) = gold border outline
+ * Bottom mode: gold text + indicator, evenly distributed
  */
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHolder> {
 
@@ -46,6 +46,8 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         ICON_MAP.put("network", R.drawable.ic_network);
         ICON_MAP.put("networks", R.drawable.ic_network);
         ICON_MAP.put("religion", R.drawable.ic_religion);
+        ICON_MAP.put("relagon", R.drawable.ic_religion);
+        ICON_MAP.put("دين", R.drawable.ic_religion);
         ICON_MAP.put("settings", R.drawable.ic_settings);
     }
 
@@ -104,34 +106,9 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
         boolean isSelected = position == selectedPosition;
 
         if (isSideMode) {
-            // Side mode: selected = gold background with dark text (like website)
-            if (isSelected) {
-                GradientDrawable bg = new GradientDrawable();
-                bg.setCornerRadius(12f);
-                bg.setColor(GOLD);
-                holder.itemView.setBackground(bg);
-                holder.name.setTextColor(DARK_BG);
-                if (holder.icon != null) {
-                    holder.icon.setColorFilter(DARK_BG, PorterDuff.Mode.SRC_IN);
-                }
-                if (holder.indicator != null) holder.indicator.setVisibility(View.GONE);
-            } else {
-                holder.itemView.setBackground(null);
-                holder.name.setTextColor(Color.WHITE);
-                if (holder.icon != null) {
-                    holder.icon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
-                }
-                if (holder.indicator != null) holder.indicator.setVisibility(View.GONE);
-            }
+            applySideStyle(holder, isSelected, false);
         } else {
-            // Bottom mode: gold text + indicator
-            holder.name.setTextColor(isSelected ? GOLD : Color.WHITE);
-            if (holder.icon != null) {
-                holder.icon.setColorFilter(isSelected ? GOLD : Color.WHITE, PorterDuff.Mode.SRC_IN);
-            }
-            if (holder.indicator != null) {
-                holder.indicator.setVisibility(isSelected ? View.VISIBLE : View.INVISIBLE);
-            }
+            applyBottomStyle(holder, isSelected);
         }
 
         holder.itemView.setOnClickListener(v -> {
@@ -140,54 +117,79 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.ViewHo
             listener.onClick(data.get(pos));
         });
 
-        // Focus effect for TV remote
         holder.itemView.setFocusable(true);
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                if (isSideMode) {
-                    GradientDrawable bg = new GradientDrawable();
-                    bg.setCornerRadius(12f);
-                    bg.setColor(GOLD);
-                    v.setBackground(bg);
-                    holder.name.setTextColor(DARK_BG);
-                    if (holder.icon != null) {
-                        holder.icon.setColorFilter(DARK_BG, PorterDuff.Mode.SRC_IN);
+            if (isSideMode) {
+                boolean sel = holder.getAdapterPosition() == selectedPosition;
+                if (hasFocus) {
+                    if (sel) {
+                        // Already gold bg, just scale
+                        applySideStyle(holder, true, false);
+                    } else {
+                        // Focus = gold border outline (not full bg)
+                        applySideFocusStyle(holder);
                     }
+                    v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(100).start();
                 } else {
+                    applySideStyle(holder, sel, false);
+                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
+                }
+            } else {
+                boolean sel = holder.getAdapterPosition() == selectedPosition;
+                if (hasFocus) {
                     holder.name.setTextColor(GOLD);
                     if (holder.icon != null) {
                         holder.icon.setColorFilter(GOLD, PorterDuff.Mode.SRC_IN);
                     }
-                }
-                v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(100).start();
-            } else {
-                boolean sel = holder.getAdapterPosition() == selectedPosition;
-                if (isSideMode) {
-                    if (sel) {
-                        GradientDrawable bg = new GradientDrawable();
-                        bg.setCornerRadius(12f);
-                        bg.setColor(GOLD);
-                        v.setBackground(bg);
-                        holder.name.setTextColor(DARK_BG);
-                        if (holder.icon != null) {
-                            holder.icon.setColorFilter(DARK_BG, PorterDuff.Mode.SRC_IN);
-                        }
-                    } else {
-                        v.setBackground(null);
-                        holder.name.setTextColor(Color.WHITE);
-                        if (holder.icon != null) {
-                            holder.icon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
-                        }
-                    }
+                    v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(100).start();
                 } else {
-                    holder.name.setTextColor(sel ? GOLD : Color.WHITE);
-                    if (holder.icon != null) {
-                        holder.icon.setColorFilter(sel ? GOLD : Color.WHITE, PorterDuff.Mode.SRC_IN);
-                    }
+                    applyBottomStyle(holder, sel);
+                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
                 }
-                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
             }
         });
+    }
+
+    private void applySideStyle(ViewHolder holder, boolean selected, boolean focused) {
+        if (selected) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(12f);
+            bg.setColor(GOLD);
+            holder.itemView.setBackground(bg);
+            holder.name.setTextColor(DARK_BG);
+            if (holder.icon != null) {
+                holder.icon.setColorFilter(DARK_BG, PorterDuff.Mode.SRC_IN);
+            }
+        } else {
+            holder.itemView.setBackground(null);
+            holder.name.setTextColor(Color.WHITE);
+            if (holder.icon != null) {
+                holder.icon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
+            }
+        }
+    }
+
+    /** Focus style for non-selected sidebar items: gold border outline */
+    private void applySideFocusStyle(ViewHolder holder) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(12f);
+        bg.setStroke(3, GOLD);
+        bg.setColor(Color.TRANSPARENT);
+        holder.itemView.setBackground(bg);
+        holder.name.setTextColor(GOLD);
+        if (holder.icon != null) {
+            holder.icon.setColorFilter(GOLD, PorterDuff.Mode.SRC_IN);
+        }
+    }
+
+    private void applyBottomStyle(ViewHolder holder, boolean selected) {
+        holder.name.setTextColor(selected ? GOLD : Color.WHITE);
+        if (holder.icon != null) {
+            holder.icon.setColorFilter(selected ? GOLD : Color.WHITE, PorterDuff.Mode.SRC_IN);
+        }
+        if (holder.indicator != null) {
+            holder.indicator.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+        }
     }
 
     @Override

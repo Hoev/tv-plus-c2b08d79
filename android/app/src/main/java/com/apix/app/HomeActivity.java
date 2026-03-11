@@ -4,11 +4,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.TextWatcher;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -47,8 +52,8 @@ import java.util.Map;
 
 /**
  * Native Home Activity - matches website design exactly
- * Portrait: bottom nav with icons, 2-col channels, APiX header + search
- * Landscape/TV: right sidebar with APiX logo + categories, clock + search top center, 2-col channels
+ * Portrait: bottom nav (fixed equal width), 2-col channels, APiX header + search
+ * Landscape/TV: right sidebar, clock + search, 2-col channels
  */
 public class HomeActivity extends AppCompatActivity {
 
@@ -103,9 +108,6 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // NO fullscreen in home - let system bars show normally
-        // Fullscreen is only for PlayerActivity
-
         initViews();
         initFirebase();
         loadData();
@@ -126,6 +128,18 @@ public class HomeActivity extends AppCompatActivity {
         clockHandler.post(clockRunnable);
     }
 
+    private void setApixBranding(TextView tv) {
+        // "APiX" - AP white bold, iX gold bold
+        SpannableString spannable = new SpannableString("APiX");
+        // AP = white
+        spannable.setSpan(new ForegroundColorSpan(Color.WHITE), 0, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        spannable.setSpan(new StyleSpan(Typeface.BOLD), 0, 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        // iX = gold
+        spannable.setSpan(new ForegroundColorSpan(Color.parseColor("#FFD700")), 2, 4, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        spannable.setSpan(new StyleSpan(Typeface.BOLD), 2, 4, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        tv.setText(spannable);
+    }
+
     private void initViews() {
         loadingBar = findViewById(R.id.loading_bar);
         errorLayout = findViewById(R.id.error_layout);
@@ -136,6 +150,10 @@ public class HomeActivity extends AppCompatActivity {
         categoriesRecyclerPortrait = findViewById(R.id.categories_recycler);
         channelsRecyclerPortrait = findViewById(R.id.channels_recycler);
         categoryTitlePortrait = findViewById(R.id.category_title);
+
+        // Set APiX branding on portrait header
+        TextView appNamePortrait = findViewById(R.id.app_name_portrait);
+        setApixBranding(appNamePortrait);
 
         // Landscape
         landscapeLayout = findViewById(R.id.landscape_layout);
@@ -176,14 +194,12 @@ public class HomeActivity extends AppCompatActivity {
 
         // Search results
         searchAdapter = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
-        int searchSpan = getResources().getConfiguration().orientation ==
-            Configuration.ORIENTATION_LANDSCAPE ? 2 : 2;
+        int searchSpan = 2;
         searchResultsRecycler.setLayoutManager(new GridLayoutManager(this, searchSpan));
         searchResultsRecycler.setAdapter(searchAdapter);
 
-        // Portrait: bottom nav horizontal, reversed for RTL feel (first from right)
-        categoriesRecyclerPortrait.setLayoutManager(
-            new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, true));
+        // Portrait: bottom nav - use GridLayoutManager for equal width distribution
+        // Will be set after data loads (need category count)
         categoryAdapterPortrait = new CategoryAdapter(this, categories, this::onCategorySelected);
         categoryAdapterPortrait.setSideMode(false);
         categoriesRecyclerPortrait.setAdapter(categoryAdapterPortrait);
@@ -192,7 +208,7 @@ public class HomeActivity extends AppCompatActivity {
         channelAdapterPortrait = new ChannelAdapter(this, new ArrayList<>(), this::onChannelClick);
         channelsRecyclerPortrait.setAdapter(channelAdapterPortrait);
 
-        // Landscape: vertical side categories, 2 columns for bigger cards
+        // Landscape: vertical side categories, 2 columns
         categoriesRecyclerLandscape.setLayoutManager(
             new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
         categoryAdapterLandscape = new CategoryAdapter(this, categories, this::onCategorySelected);
@@ -204,6 +220,18 @@ public class HomeActivity extends AppCompatActivity {
         channelsRecyclerLandscape.setAdapter(channelAdapterLandscape);
 
         applyLayout();
+    }
+
+    private void setupBottomNavLayout() {
+        // Use GridLayoutManager with span = category count for equal distribution
+        int count = categories.size();
+        if (count > 0) {
+            GridLayoutManager glm = new GridLayoutManager(this, count);
+            categoriesRecyclerPortrait.setLayoutManager(glm);
+        } else {
+            categoriesRecyclerPortrait.setLayoutManager(
+                new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, true));
+        }
     }
 
     private void showSearch() {
@@ -333,6 +361,9 @@ public class HomeActivity extends AppCompatActivity {
                 }
 
                 Collections.sort(categories, (a, b) -> a.sortOrder - b.sortOrder);
+
+                // Setup bottom nav with equal width after knowing category count
+                setupBottomNavLayout();
 
                 categoryAdapterPortrait.updateData(categories);
                 categoryAdapterLandscape.updateData(categories);
@@ -552,6 +583,7 @@ public class HomeActivity extends AppCompatActivity {
         applyLayout();
 
         if (!categories.isEmpty()) {
+            setupBottomNavLayout();
             categoryAdapterPortrait.updateData(categories);
             categoryAdapterLandscape.updateData(categories);
             updateChannels();
