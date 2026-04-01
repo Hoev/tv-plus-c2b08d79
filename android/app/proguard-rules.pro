@@ -37,6 +37,7 @@
 -keep class com.apix.app.StreamConfig$* { *; }
 -keep class com.apix.app.FirebaseModels { *; }
 -keep class com.apix.app.FirebaseModels$* { *; }
+-keep class com.apix.app.data.** { *; }
 
 # Keep security monitor entry points
 -keep class com.apix.app.SecurityMonitor {
@@ -54,6 +55,18 @@
 -keep class com.apix.app.MainActivity { *; }
 -keep class com.apix.app.PlayerActivity { *; }
 -keep class com.apix.app.WebViewActivity { *; }
+-keep class com.apix.app.ComposeActivity { *; }
+
+# Compose
+-dontwarn androidx.compose.**
+-keep class androidx.compose.** { *; }
+
+# Coil
+-keep class coil.** { *; }
+
+# Kotlin
+-keep class kotlin.** { *; }
+-keep class kotlinx.** { *; }
 
 # ===== ANTI-DECOMPILATION =====
 -renamesourcefileattribute ''
