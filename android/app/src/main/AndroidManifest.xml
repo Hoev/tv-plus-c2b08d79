@@ -33,21 +33,28 @@
             </intent-filter>
         </activity>
 
-        <!-- Home Activity (Native UI) -->
+        <!-- Compose Main Activity (NEW - Jetpack Compose UI) -->
+        <activity
+            android:name=".ComposeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden|layoutDirection"
+            android:theme="@style/Theme.TVPlus.NoActionBar" />
+
+        <!-- Legacy Home Activity (kept for backward compatibility) -->
         <activity
             android:name=".HomeActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.TVPlus.NoActionBar" />
 
-        <!-- Sub Menu Activity -->
+        <!-- Sub Menu Activity (legacy) -->
         <activity
             android:name=".SubMenuActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.TVPlus.NoActionBar" />
 
-        <!-- Player Activity (Full Screen Landscape) -->
+        <!-- Player Activity (legacy ExoPlayer) -->
         <activity
             android:name=".PlayerActivity"
             android:exported="false"
@@ -55,14 +62,14 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.TVPlus.Fullscreen" />
 
-        <!-- WebView Activity (For android_action_type: webview) -->
+        <!-- WebView Activity -->
         <activity
             android:name=".WebViewActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.TVPlus.NoActionBar" />
 
-        <!-- Old MainActivity kept for backward compatibility but not launched -->
+        <!-- Old MainActivity -->
         <activity
             android:name=".MainActivity"
             android:exported="false"

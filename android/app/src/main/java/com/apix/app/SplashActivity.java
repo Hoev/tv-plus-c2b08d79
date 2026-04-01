@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * Splash screen - shows loading bar only, no text feedback
+ * Now launches ComposeActivity instead of HomeActivity
  */
 public class SplashActivity extends AppCompatActivity {
 
@@ -35,8 +36,8 @@ public class SplashActivity extends AppCompatActivity {
         SecurityMonitor.getInstance(this).runInitialCheckAsync((passed, failReason) -> {
             new Handler(Looper.getMainLooper()).post(() -> {
                 if (passed) {
-                    // Directly launch home - no "verified" message
-                    startActivity(new Intent(SplashActivity.this, HomeActivity.class));
+                    // Launch Compose UI instead of legacy HomeActivity
+                    startActivity(new Intent(SplashActivity.this, ComposeActivity.class));
                     finish();
                     SecurityMonitor.getInstance(SplashActivity.this).startMonitor();
                 } else {
