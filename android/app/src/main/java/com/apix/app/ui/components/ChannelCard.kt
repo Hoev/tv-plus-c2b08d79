@@ -40,13 +40,15 @@ fun ChannelCard(
     val isFocused by interactionSource.collectIsFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    val isHighlighted = isFocused || isPressed
+
     val scale by animateFloatAsState(
-        targetValue = if (isFocused || isPressed) 1.05f else 1f,
+        targetValue = if (isHighlighted) 1.05f else 1f,
         label = "channelScale"
     )
 
-    val borderColor = if (isFocused) Gold else Color.Transparent
-    val shadowElevation = if (isFocused) 12.dp else 0.dp
+    val borderColor = if (isHighlighted) Gold else Color(0xFF333333)
+    val borderWidth = if (isHighlighted) 3.dp else 1.dp
 
     Box(
         modifier = modifier
@@ -54,11 +56,11 @@ fun ChannelCard(
             .scale(scale)
             .clip(RoundedCornerShape(12.dp))
             .border(
-                width = if (isFocused) 3.dp else 1.dp,
-                color = if (isFocused) Gold else Color(0xFF333333),
+                width = borderWidth,
+                color = borderColor,
                 shape = RoundedCornerShape(12.dp)
             )
-            .shadow(shadowElevation, RoundedCornerShape(12.dp))
+            .shadow(if (isHighlighted) 12.dp else 0.dp, RoundedCornerShape(12.dp))
             .background(Color(0xFF1A1A1A), RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = interactionSource,
@@ -98,15 +100,6 @@ fun ChannelCard(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Start,
                 modifier = Modifier.align(Alignment.BottomStart)
-            )
-        }
-
-        // Gold glow when focused (for TV)
-        if (isFocused) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(3.dp, Gold, RoundedCornerShape(12.dp))
             )
         }
     }

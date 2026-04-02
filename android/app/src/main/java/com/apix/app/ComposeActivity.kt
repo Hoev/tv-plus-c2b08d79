@@ -1,6 +1,6 @@
 package com.apix.app
 
-import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -36,16 +36,38 @@ class ComposeActivity : ComponentActivity() {
             FirebaseApp.initializeApp(this, options)
         }
 
-        // Show system bars (not fullscreen)
+        // Show system bars normally
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
         setContent {
             var isDarkMode by remember { mutableStateOf(true) }
+            var isInPlayer by remember { mutableStateOf(false) }
+
+            // Control immersive mode and orientation based on player state
+            LaunchedEffect(isInPlayer) {
+                if (isInPlayer) {
+                    // Force landscape + immersive for player
+                    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    WindowCompat.setDecorFitsSystemWindows(window, false)
+                    WindowInsetsControllerCompat(window, window.decorView).let { ctrl ->
+                        ctrl.hide(WindowInsetsCompat.Type.systemBars())
+                        ctrl.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    }
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    // Restore normal mode
+                    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    WindowCompat.setDecorFitsSystemWindows(window, true)
+                    WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
 
             APiXTheme(darkTheme = isDarkMode) {
                 AppNavigation(
                     isDarkMode = isDarkMode,
-                    onToggleDarkMode = { isDarkMode = it }
+                    onToggleDarkMode = { isDarkMode = it },
+                    onPlayerStateChanged = { isInPlayer = it }
                 )
             }
         }
@@ -62,18 +84,39 @@ sealed class Screen {
 @Composable
 fun AppNavigation(
     isDarkMode: Boolean,
-    onToggleDarkMode: (Boolean) -> Unit
+    onToggleDarkMode: (Boolean) -> Unit,
+    onPlayerStateChanged: (Boolean) -> Unit
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     val sideMenus by viewModel.sideMenus.collectAsState()
     val gson = remember { Gson() }
 
+    // Navigation stack for proper back behavior
+    val navigationStack = remember { mutableStateListOf<Screen>() }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
     var isSettings by remember { mutableStateOf(false) }
 
+    // Notify activity about player state
+    LaunchedEffect(currentScreen) {
+        onPlayerStateChanged(currentScreen is Screen.Player)
+    }
+
     val channels = remember(uiState.selectedCategory) {
         viewModel.getVisibleChannels()
+    }
+
+    fun navigateTo(screen: Screen) {
+        navigationStack.add(currentScreen)
+        currentScreen = screen
+    }
+
+    fun goBack(): Boolean {
+        if (navigationStack.isNotEmpty()) {
+            currentScreen = navigationStack.removeLast()
+            return true
+        }
+        return false
     }
 
     fun handleChannelClick(channel: Channel) {
@@ -96,7 +139,7 @@ fun AppNavigation(
                             androidActionType = sc.androidActionType
                         )
                     } ?: emptyList()
-                currentScreen = Screen.SubChannels(channel.name, subChannels)
+                navigateTo(Screen.SubChannels(channel.name, subChannels))
             }
             "external_link" -> {
                 channel.externalUrl?.let { url ->
@@ -105,13 +148,12 @@ fun AppNavigation(
             }
             else -> {
                 val config = viewModel.buildPlayerConfig(channel) ?: return
-                currentScreen = Screen.Player(config)
+                navigateTo(Screen.Player(config))
             }
         }
     }
 
     fun handleCategorySelect(cat: Category) {
-        // Check if it's "settings" category
         val lower = cat.name.lowercase()
         if (lower.contains("setting") || lower.contains("إعدادات")) {
             isSettings = true
@@ -121,12 +163,13 @@ fun AppNavigation(
         }
     }
 
-    // Back handling
-    androidx.activity.compose.BackHandler(currentScreen !is Screen.Main) {
-        currentScreen = Screen.Main
-    }
-    androidx.activity.compose.BackHandler(currentScreen is Screen.Main && isSettings) {
-        isSettings = false
+    // Back handling - use stack
+    androidx.activity.compose.BackHandler(currentScreen !is Screen.Main || isSettings) {
+        if (isSettings) {
+            isSettings = false
+        } else {
+            goBack()
+        }
     }
 
     when (val screen = currentScreen) {
@@ -141,7 +184,7 @@ fun AppNavigation(
                     uiState = uiState,
                     onCategorySelected = ::handleCategorySelect,
                     onChannelClick = ::handleChannelClick,
-                    onSearchClick = { currentScreen = Screen.Search },
+                    onSearchClick = { navigateTo(Screen.Search) },
                     channels = channels
                 )
             }
@@ -151,7 +194,7 @@ fun AppNavigation(
                 menuName = screen.menuName,
                 channels = screen.channels,
                 onChannelClick = ::handleChannelClick,
-                onBack = { currentScreen = Screen.Main }
+                onBack = { goBack() }
             )
         }
         is Screen.Search -> {
@@ -160,16 +203,16 @@ fun AppNavigation(
                 onChannelClick = { ch ->
                     val config = viewModel.buildPlayerConfig(ch)
                     if (config != null) {
-                        currentScreen = Screen.Player(config)
+                        navigateTo(Screen.Player(config))
                     }
                 },
-                onClose = { currentScreen = Screen.Main }
+                onClose = { goBack() }
             )
         }
         is Screen.Player -> {
             PlayerScreen(
                 config = screen.config,
-                onBack = { currentScreen = Screen.Main }
+                onBack = { goBack() }
             )
         }
     }
