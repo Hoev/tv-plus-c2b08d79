@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -60,23 +61,22 @@ fun SubChannelScreen(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Title header: "TV PLUS" style with APiX branding
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back button
                 val backInteraction = remember { MutableInteractionSource() }
                 val backFocused by backInteraction.collectIsFocusedAsState()
+                val backPressed by backInteraction.collectIsPressedAsState()
 
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier
                         .focusable(interactionSource = backInteraction)
                         .then(
-                            if (backFocused) Modifier.border(2.dp, Gold, RoundedCornerShape(8.dp))
+                            if (backFocused || backPressed) Modifier.border(2.dp, Gold, RoundedCornerShape(8.dp))
                             else Modifier
                         )
                 ) {
@@ -89,7 +89,6 @@ fun SubChannelScreen(
 
                 Spacer(Modifier.weight(1f))
 
-                // Title
                 Text(
                     text = buildAnnotatedString {
                         withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.ExtraBold)) {
@@ -107,11 +106,9 @@ fun SubChannelScreen(
                 )
 
                 Spacer(Modifier.weight(1f))
-                // Spacer for balance
                 Spacer(Modifier.width(48.dp))
             }
 
-            // Sub-channel grid
             LazyVerticalGrid(
                 columns = GridCells.Fixed(cols),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
@@ -138,9 +135,11 @@ private fun SubChannelCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val isHighlighted = isFocused || isPressed
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.05f else 1f,
+        targetValue = if (isHighlighted) 1.05f else 1f,
         label = "subScale"
     )
 
@@ -150,8 +149,8 @@ private fun SubChannelCard(
             .scale(scale)
             .clip(RoundedCornerShape(12.dp))
             .border(
-                width = if (isFocused) 3.dp else 1.dp,
-                color = if (isFocused) Gold else Color(0xFF444444),
+                width = if (isHighlighted) 3.dp else 1.dp,
+                color = if (isHighlighted) Gold else Color(0xFF444444),
                 shape = RoundedCornerShape(12.dp)
             )
             .background(CharcoalCard, RoundedCornerShape(12.dp))
@@ -171,7 +170,6 @@ private fun SubChannelCard(
             )
         }
 
-        // Bottom overlay
         Box(
             modifier = Modifier
                 .fillMaxWidth()

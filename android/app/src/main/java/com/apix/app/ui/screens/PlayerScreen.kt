@@ -11,14 +11,20 @@ import android.util.Rational
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +45,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.*
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -76,6 +84,8 @@ fun PlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var currentResizeMode by remember { mutableIntStateOf(0) }
+    var showTrackDialog by remember { mutableStateOf(false) }
+    var isMuted by remember { mutableStateOf(false) }
 
     val resizeModes = remember {
         intArrayOf(
@@ -85,10 +95,8 @@ fun PlayerScreen(
         )
     }
 
+    val trackSelector = remember { DefaultTrackSelector(context) }
     val player = remember {
-        val trackSelector = DefaultTrackSelector(context).apply {
-            setParameters(buildUponParameters().setMaxVideoSizeSd().build())
-        }
         ExoPlayer.Builder(context)
             .setTrackSelector(trackSelector)
             .build()
@@ -97,6 +105,8 @@ fun PlayerScreen(
     // Initialize player
     LaunchedEffect(config) {
         try {
+            player.stop()
+            player.clearMediaItems()
             val dataSourceFactory = buildDataSourceFactory(config)
             val resolvedClearKey = if (config.drm != null) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -119,17 +129,12 @@ fun PlayerScreen(
             override fun onPlaybackStateChanged(state: Int) {
                 isBuffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) {
-                    (player.trackSelector as? DefaultTrackSelector)?.setParameters(
-                        (player.trackSelector as DefaultTrackSelector)
-                            .buildUponParameters().clearVideoSizeConstraints().build()
+                    trackSelector.setParameters(
+                        trackSelector.buildUponParameters().clearVideoSizeConstraints().build()
                     )
                 }
             }
-
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-
+            override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlayerError(error: PlaybackException) {
                 errorMessage = when (error.errorCode) {
                     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "خطأ في الشبكة"
@@ -160,7 +165,7 @@ fun PlayerScreen(
     // Auto-hide controls
     LaunchedEffect(showControls) {
         if (showControls) {
-            delay(3000)
+            delay(5000)
             showControls = false
         }
     }
@@ -196,7 +201,7 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Buffering spinner
+            // Buffering spinner (center)
             if (isBuffering) {
                 CircularProgressIndicator(
                     color = MediumRed,
@@ -220,7 +225,7 @@ fun PlayerScreen(
                         Spacer(Modifier.height(16.dp))
                         Text(err, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(24.dp))
-                        PlayerIconButton(
+                        PlayerControlButton(
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "إغلاق",
                             onClick = onBack
@@ -230,120 +235,433 @@ fun PlayerScreen(
             }
 
             // Controls overlay
-            if (showControls && errorMessage == null) {
-                // Top bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PlayerIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        onClick = onBack
-                    )
-                    Text(
-                        text = config.title,
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Center controls
-                Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalArrangement = Arrangement.spacedBy(40.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PlayerIconButton(
-                        icon = Icons.Default.FastRewind,
-                        contentDescription = "Rewind",
-                        size = 48,
-                        onClick = { player.seekBack() }
-                    )
-                    PlayerIconButton(
-                        icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        size = 64,
-                        onClick = { player.playWhenReady = !player.playWhenReady }
-                    )
-                    PlayerIconButton(
-                        icon = Icons.Default.FastForward,
-                        contentDescription = "Forward",
-                        size = 48,
-                        onClick = { player.seekForward() }
-                    )
-                }
-
-                // Bottom controls
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                ) {
-                    // Progress bar
-                    Slider(
-                        value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                        onValueChange = { player.seekTo((it * duration).toLong()) },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = MediumRed,
-                            inactiveTrackColor = Color(0xFF444444)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Time + icons row
+            AnimatedVisibility(
+                visible = showControls && errorMessage == null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    // Top bar - back (left) + channel name (right)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    listOf(Color.Black.copy(0.7f), Color.Transparent)
+                                )
+                            )
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Time left
-                        Text(
-                            text = "${formatTime(currentPosition)} / ${formatTime(duration)}",
-                            color = Color(0xAAFFFFFF),
-                            fontSize = 13.sp
+                        PlayerControlButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            size = 40,
+                            onClick = onBack
                         )
+                        Text(
+                            text = config.title,
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-                        // Right icons
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            PlayerIconButton(Icons.Default.Cast, "Cast", size = 36) {}
-                            PlayerIconButton(Icons.Default.VolumeUp, "Volume", size = 36) {
-                                player.volume = if (player.volume > 0f) 0f else 1f
+                    // Bottom section - progress bar + controls
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Black.copy(0.7f))
+                                )
+                            )
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        // Progress bar with time on sides
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = formatTime(currentPosition),
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.width(50.dp)
+                            )
+                            Slider(
+                                value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                                onValueChange = { player.seekTo((it * duration).toLong()) },
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color.White,
+                                    activeTrackColor = MediumRed,
+                                    inactiveTrackColor = Color(0xFF555555)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = formatTime(duration),
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.width(50.dp)
+                            )
+                        }
+
+                        // Bottom row: left (rewind/play/forward) + right (cast/volume/quality/resize/pip)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Left controls
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                PlayerControlButton(
+                                    icon = Icons.Default.FastRewind,
+                                    contentDescription = "Rewind",
+                                    size = 40,
+                                    onClick = { player.seekBack() }
+                                )
+                                PlayerControlButton(
+                                    icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = "Play/Pause",
+                                    size = 48,
+                                    onClick = { player.playWhenReady = !player.playWhenReady }
+                                )
+                                PlayerControlButton(
+                                    icon = Icons.Default.FastForward,
+                                    contentDescription = "Forward",
+                                    size = 40,
+                                    onClick = { player.seekForward() }
+                                )
                             }
-                            PlayerIconButton(Icons.Default.Settings, "Settings", size = 36) {
-                                // Track selection handled by existing Java dialog logic
-                            }
-                            PlayerIconButton(Icons.Default.Fullscreen, "Resize", size = 36) {
-                                currentResizeMode = (currentResizeMode + 1) % resizeModes.size
-                            }
-                            PlayerIconButton(Icons.Default.PictureInPicture, "PiP", size = 36) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null) {
-                                    try {
-                                        activity.enterPictureInPictureMode(
-                                            PictureInPictureParams.Builder()
-                                                .setAspectRatio(Rational(16, 9))
-                                                .build()
-                                        )
-                                    } catch (_: Exception) {}
+
+                            // Right controls
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                PlayerControlButton(
+                                    icon = Icons.Default.Cast,
+                                    contentDescription = "Cast",
+                                    size = 36
+                                ) {}
+                                PlayerControlButton(
+                                    icon = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                    contentDescription = "Volume",
+                                    size = 36
+                                ) {
+                                    isMuted = !isMuted
+                                    player.volume = if (isMuted) 0f else 1f
+                                }
+                                PlayerControlButton(
+                                    icon = Icons.Default.Settings,
+                                    contentDescription = "Quality",
+                                    size = 36
+                                ) {
+                                    showTrackDialog = true
+                                }
+                                PlayerControlButton(
+                                    icon = Icons.Default.FitScreen,
+                                    contentDescription = "Resize",
+                                    size = 36
+                                ) {
+                                    currentResizeMode = (currentResizeMode + 1) % resizeModes.size
+                                }
+                                PlayerControlButton(
+                                    icon = Icons.Default.PictureInPicture,
+                                    contentDescription = "PiP",
+                                    size = 36
+                                ) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null) {
+                                        try {
+                                            activity.enterPictureInPictureMode(
+                                                PictureInPictureParams.Builder()
+                                                    .setAspectRatio(Rational(16, 9))
+                                                    .build()
+                                            )
+                                        } catch (_: Exception) {}
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+
+            // Track selection dialog
+            if (showTrackDialog) {
+                TrackSelectionDialog(
+                    player = player,
+                    trackSelector = trackSelector,
+                    onDismiss = { showTrackDialog = false }
+                )
+            }
         }
     }
 }
 
+// ===== Track Selection Dialog =====
+
+@OptIn(UnstableApi::class)
 @Composable
-fun PlayerIconButton(
+fun TrackSelectionDialog(
+    player: ExoPlayer,
+    trackSelector: DefaultTrackSelector,
+    onDismiss: () -> Unit
+) {
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Video, 1 = Audio
+    val tabs = listOf("الجودة", "الصوت")
+
+    // Collect video tracks
+    val videoTracks = remember(player.currentTracks) {
+        val tracks = mutableListOf<TrackInfo>()
+        tracks.add(TrackInfo("Auto", -1, -1, true))
+        player.currentTracks.groups.forEachIndexed { groupIndex, group ->
+            if (group.type == C.TRACK_TYPE_VIDEO) {
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val height = format.height
+                    val label = if (height > 0) "${height}p" else "Track ${i + 1}"
+                    tracks.add(TrackInfo(label, groupIndex, i, group.isTrackSelected(i)))
+                }
+            }
+        }
+        tracks
+    }
+
+    // Collect audio tracks
+    val audioTracks = remember(player.currentTracks) {
+        val tracks = mutableListOf<TrackInfo>()
+        player.currentTracks.groups.forEachIndexed { groupIndex, group ->
+            if (group.type == C.TRACK_TYPE_AUDIO) {
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val lang = format.language ?: "Unknown"
+                    val label = format.label ?: lang.uppercase()
+                    tracks.add(TrackInfo(label, groupIndex, i, group.isTrackSelected(i)))
+                }
+            }
+        }
+        if (tracks.isEmpty()) tracks.add(TrackInfo("Default", -1, -1, true))
+        tracks
+    }
+
+    var selectedVideoIndex by remember {
+        mutableIntStateOf(videoTracks.indexOfFirst { it.isSelected }.coerceAtLeast(0))
+    }
+    var selectedAudioIndex by remember {
+        mutableIntStateOf(audioTracks.indexOfFirst { it.isSelected }.coerceAtLeast(0))
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.5f)
+                .fillMaxHeight(0.7f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1A1A1A))
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                // Tab headers
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF111111))
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        val isActive = selectedTab == index
+                        val tabInteraction = remember { MutableInteractionSource() }
+                        val tabFocused by tabInteraction.collectIsFocusedAsState()
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(
+                                    interactionSource = tabInteraction,
+                                    indication = null
+                                ) { selectedTab = index }
+                                .focusable(interactionSource = tabInteraction)
+                                .then(
+                                    if (tabFocused) Modifier.border(2.dp, Gold, RoundedCornerShape(4.dp))
+                                    else Modifier
+                                )
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = title,
+                                    color = if (isActive) Gold else Color(0xFF888888),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (isActive) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Box(
+                                        Modifier
+                                            .width(40.dp)
+                                            .height(3.dp)
+                                            .background(Gold, RoundedCornerShape(2.dp))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Divider(color = Color(0xFF333333), thickness = 1.dp)
+
+                // Track list
+                val currentTracks = if (selectedTab == 0) videoTracks else audioTracks
+                val currentSelected = if (selectedTab == 0) selectedVideoIndex else selectedAudioIndex
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                ) {
+                    itemsIndexed(currentTracks) { index, track ->
+                        val itemInteraction = remember { MutableInteractionSource() }
+                        val itemFocused by itemInteraction.collectIsFocusedAsState()
+                        val isItemSelected = index == currentSelected
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    when {
+                                        isItemSelected -> Color(0xFF333333)
+                                        itemFocused -> Color(0xFF2A2A2A)
+                                        else -> Color.Transparent
+                                    }
+                                )
+                                .then(
+                                    if (itemFocused) Modifier.border(2.dp, Gold, RoundedCornerShape(10.dp))
+                                    else Modifier
+                                )
+                                .clickable(
+                                    interactionSource = itemInteraction,
+                                    indication = null
+                                ) {
+                                    if (selectedTab == 0) {
+                                        selectedVideoIndex = index
+                                        applyVideoTrack(trackSelector, track)
+                                    } else {
+                                        selectedAudioIndex = index
+                                        applyAudioTrack(trackSelector, track, player)
+                                    }
+                                }
+                                .focusable(interactionSource = itemInteraction)
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = track.label,
+                                    color = if (isItemSelected) Gold else Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isItemSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (isItemSelected) {
+                                    Spacer(Modifier.width(8.dp))
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Gold,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Close button
+                Divider(color = Color(0xFF333333), thickness = 1.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDismiss() }
+                        .padding(14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("إغلاق", color = Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+data class TrackInfo(
+    val label: String,
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val isSelected: Boolean
+)
+
+@OptIn(UnstableApi::class)
+private fun applyVideoTrack(trackSelector: DefaultTrackSelector, track: TrackInfo) {
+    if (track.groupIndex == -1) {
+        // Auto
+        trackSelector.setParameters(
+            trackSelector.buildUponParameters()
+                .clearVideoSizeConstraints()
+                .setMaxVideoSizeSd() // let player decide
+                .clearVideoSizeConstraints()
+                .build()
+        )
+    } else {
+        trackSelector.setParameters(
+            trackSelector.buildUponParameters()
+                .clearVideoSizeConstraints()
+                .setOverrideForType(
+                    TrackSelectionOverride(
+                        trackSelector.currentMappedTrackInfo!!.getTrackGroups(C.TRACK_TYPE_VIDEO)
+                            .get(0),
+                        listOf(track.trackIndex)
+                    )
+                )
+                .build()
+        )
+    }
+}
+
+@OptIn(UnstableApi::class)
+private fun applyAudioTrack(trackSelector: DefaultTrackSelector, track: TrackInfo, player: ExoPlayer) {
+    if (track.groupIndex == -1) return
+    trackSelector.setParameters(
+        trackSelector.buildUponParameters()
+            .setOverrideForType(
+                TrackSelectionOverride(
+                    trackSelector.currentMappedTrackInfo!!.getTrackGroups(C.TRACK_TYPE_AUDIO)
+                        .get(track.groupIndex),
+                    listOf(track.trackIndex)
+                )
+            )
+            .build()
+    )
+}
+
+// ===== Player Control Button =====
+
+@Composable
+fun PlayerControlButton(
     icon: ImageVector,
     contentDescription: String,
     size: Int = 44,
@@ -351,7 +669,9 @@ fun PlayerIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val scale by animateFloatAsState(if (isFocused) 1.15f else 1f, label = "playerBtnScale")
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val isHighlighted = isFocused || isPressed
+    val scale by animateFloatAsState(if (isHighlighted) 1.2f else 1f, label = "playerBtnScale")
 
     Box(
         modifier = Modifier
@@ -374,7 +694,7 @@ fun PlayerIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = Color.White,
-            modifier = Modifier.size((size * 0.6f).dp)
+            modifier = Modifier.size((size * 0.65f).dp)
         )
     }
 }
@@ -475,25 +795,18 @@ private fun resolveClearKey(config: PlayerConfig): String? {
     val key = drm.key
     val licenseUrl = drm.licenseUrl
 
-    // Strategy 1: License URL API
     if (!licenseUrl.isNullOrEmpty() && licenseUrl.startsWith("http") && keyId.isNullOrEmpty()) {
         fetchClearKeyFromApi(licenseUrl)?.let { return it }
     }
-
-    // Strategy 2: keyId contains URL
     if (!keyId.isNullOrEmpty() && keyId.contains("http")) {
         val apiUrl = if (keyId.contains(":http")) keyId.substring(keyId.indexOf("http")) else keyId
         fetchClearKeyFromApi(apiUrl)?.let { return it }
     }
-
-    // Strategy 3: Direct hex
     if (!keyId.isNullOrEmpty() && !key.isNullOrEmpty()) {
         val cleanKid = keyId.replace(Regex("[^a-fA-F0-9]"), "").take(32)
         val cleanKey = key.replace(Regex("[^a-fA-F0-9]"), "").take(32)
         return buildClearKeyJson(cleanKid, cleanKey)
     }
-
-    // Strategy 4: Combined
     if (!keyId.isNullOrEmpty() && keyId.contains(":") && !keyId.contains("http")) {
         val parts = keyId.split(":")
         if (parts.size >= 2) {
@@ -502,12 +815,9 @@ private fun resolveClearKey(config: PlayerConfig): String? {
             return buildClearKeyJson(kid, k)
         }
     }
-
-    // Strategy 5: License URL fallback
     if (!licenseUrl.isNullOrEmpty()) {
         fetchClearKeyFromApi(licenseUrl)?.let { return it }
     }
-
     return null
 }
 
@@ -523,9 +833,7 @@ private fun fetchClearKeyFromApi(apiUrl: String): String? {
 
         if (conn.responseCode == 200) {
             val body = BufferedReader(InputStreamReader(conn.inputStream)).readText().trim()
-
             if (body.contains("\"keys\"") && body.contains("\"kty\"")) return body
-
             try {
                 val json = com.google.gson.JsonParser.parseString(body).asJsonObject
                 val keyIdNames = arrayOf("keyid", "keyId", "key_id", "kid", "KID")
@@ -541,7 +849,6 @@ private fun fetchClearKeyFromApi(apiUrl: String): String? {
                     )
                 }
             } catch (_: Exception) {}
-
             if (body.contains(":") && !body.contains("{")) {
                 val parts = body.split(":")
                 if (parts.size == 2) {
@@ -552,9 +859,7 @@ private fun fetchClearKeyFromApi(apiUrl: String): String? {
             }
         }
     } catch (_: Exception) {
-    } finally {
-        conn?.disconnect()
-    }
+    } finally { conn?.disconnect() }
     return null
 }
 
