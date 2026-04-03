@@ -46,7 +46,6 @@ class ComposeActivity : ComponentActivity() {
             // Control immersive mode and orientation based on player state
             LaunchedEffect(isInPlayer) {
                 if (isInPlayer) {
-                    // Force landscape + immersive for player
                     requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     WindowCompat.setDecorFitsSystemWindows(window, false)
                     WindowInsetsControllerCompat(window, window.decorView).let { ctrl ->
@@ -55,7 +54,6 @@ class ComposeActivity : ComponentActivity() {
                     }
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else {
-                    // Restore normal mode
                     requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     WindowCompat.setDecorFitsSystemWindows(window, true)
                     WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
@@ -90,7 +88,6 @@ fun AppNavigation(
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     val sideMenus by viewModel.sideMenus.collectAsState()
-    val gson = remember { Gson() }
 
     // Navigation stack for proper back behavior
     val navigationStack = remember { mutableStateListOf<Screen>() }
@@ -142,9 +139,7 @@ fun AppNavigation(
                 navigateTo(Screen.SubChannels(channel.name, subChannels))
             }
             "external_link" -> {
-                channel.externalUrl?.let { url ->
-                    // handled by intent
-                }
+                // handled by intent
             }
             else -> {
                 val config = viewModel.buildPlayerConfig(channel) ?: return
@@ -163,7 +158,7 @@ fun AppNavigation(
         }
     }
 
-    // Back handling - use stack
+    // Back handling
     androidx.activity.compose.BackHandler(currentScreen !is Screen.Main || isSettings) {
         if (isSettings) {
             isSettings = false

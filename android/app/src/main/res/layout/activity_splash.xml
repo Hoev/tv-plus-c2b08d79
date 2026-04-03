@@ -12,36 +12,30 @@
         android:gravity="center"
         android:padding="32dp">
 
-        <!-- App Icon -->
-        <ImageView
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:src="@mipmap/ic_launcher"
-            android:contentDescription="APiX" />
-
+        <!-- App Name only - no icon -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="APiX"
             android:textColor="@color/gold_accent"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:layout_marginTop="16dp" />
+            android:textSize="36sp"
+            android:textStyle="bold" />
 
         <ProgressBar
             android:id="@+id/splash_progress"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginTop="32dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="24dp"
             android:indeterminateTint="@color/gold_accent" />
 
         <TextView
             android:id="@+id/splash_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="جارِ فحص الأمان..."
+            android:text=""
             android:textColor="#888888"
             android:textSize="14sp"
+            android:visibility="gone"
             android:layout_marginTop="12dp" />
 
         <TextView
