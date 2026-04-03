@@ -140,6 +140,12 @@ const AdminDashboard: React.FC = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="security">
+            <div className="max-w-2xl">
+              <SecurityConfigManager />
+            </div>
+          </TabsContent>
+
           <TabsContent value="settings">
             <div className="max-w-2xl">
               <div className="bg-card rounded-2xl p-6 border border-border space-y-6">
