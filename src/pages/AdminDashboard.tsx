@@ -93,6 +93,10 @@ const AdminDashboard: React.FC = () => {
               <Megaphone className="w-4 h-4 mr-2" />
               الإعلانات
             </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Lock className="w-4 h-4 mr-2" />
+              الحماية
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="w-4 h-4 mr-2" />
               الإعدادات
