@@ -6,10 +6,11 @@ import ChannelManager from '@/components/admin/ChannelManager';
 import SideMenuManager from '@/components/admin/SideMenuManager';
 import NotificationManager from '@/components/admin/NotificationManager';
 import AdConfigManager from '@/components/admin/AdConfigManager';
+import SecurityConfigManager from '@/components/admin/SecurityConfigManager';
 import { Category } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, Settings, Tv, Menu, Folder, Shield, Bell, Megaphone } from 'lucide-react';
+import { LogOut, Settings, Tv, Menu, Folder, Shield, Bell, Megaphone, Lock } from 'lucide-react';
 
 // Update manifest for admin PWA
 const updateAdminManifest = () => {
@@ -92,6 +93,10 @@ const AdminDashboard: React.FC = () => {
               <Megaphone className="w-4 h-4 mr-2" />
               الإعلانات
             </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Lock className="w-4 h-4 mr-2" />
+              الحماية
+            </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="w-4 h-4 mr-2" />
               الإعدادات
@@ -132,6 +137,12 @@ const AdminDashboard: React.FC = () => {
           <TabsContent value="ads">
             <div className="max-w-2xl">
               <AdConfigManager />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="security">
+            <div className="max-w-2xl">
+              <SecurityConfigManager />
             </div>
           </TabsContent>
 

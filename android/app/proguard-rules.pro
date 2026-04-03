@@ -39,13 +39,19 @@
 -keep class com.apix.app.FirebaseModels$* { *; }
 -keep class com.apix.app.data.** { *; }
 
-# Keep security monitor entry points
+# Keep security monitor - obfuscate internals but keep public API
 -keep class com.apix.app.SecurityMonitor {
     public static ** getInstance(android.content.Context);
     public void startMonitor();
     public void stopMonitor();
     public java.lang.String runInitialCheck();
     public void runInitialCheckAsync(**);
+    public java.lang.String getCurrentAppSignature();
+}
+
+# Heavily obfuscate security internals
+-keepclassmembers class com.apix.app.SecurityMonitor {
+    private <methods>;
 }
 
 # Keep activities

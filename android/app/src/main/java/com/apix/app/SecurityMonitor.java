@@ -12,7 +12,13 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Debug;
+import android.util.Log;
 import android.view.Display;
+
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -20,6 +26,7 @@ import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -28,49 +35,40 @@ import java.util.zip.ZipFile;
 /**
  * Security Monitor - Advanced Anti-Tamper & Anti-Reverse-Engineering System
  * 
- * Features:
- * - 3-second splash security check before app loads
- * - Continuous background monitoring (5-19ms)
- * - Cloud phone / virtual device detection
- * - Secondary display / VMOS detection
- * - Sniffer/Proxy/Emulator detection
- * - Debugger/Frida/Root detection
- * - APK integrity & signature verification
+ * Now supports dynamic signature verification from Firebase.
  */
 public class SecurityMonitor {
     
+    private static final String TAG = "SecurityMonitor";
     private static SecurityMonitor instance;
     private Context context;
     private Thread monitorThread;
     private volatile boolean running = false;
     
-    // HARDCODED signature hash - set for production
-    private static final String RELEASE_SIGNATURE_HASH = null;
-    private String expectedSignatureHash = null;
+    private String currentSignatureHash = null;
     private int expectedDexCount = -1;
+    
+    // Dynamic allowed signatures from Firebase
+    private volatile List<String> allowedSignatures = new ArrayList<>();
+    private volatile boolean signaturesLoaded = false;
     
     // Dangerous packages
     private static final String[] DANGEROUS_PACKAGES = {
-        // Sniffers
         "com.guoshi.httpcanary", "com.guoshi.httpcanary.premium",
         "com.minhui.networkcapture", "jp.co.because.network.analysis",
         "com.charles.proxy", "com.egorovandreyrm.pcapremote",
         "app.greyshirts.sslcapture", "com.reqbin.httpbin",
-        // Xposed / Root
         "io.anyline.xposed", "de.robv.android.xposed.installer",
         "org.lsposed.manager", "com.topjohnwu.magisk",
         "eu.chainfire.supersu", "me.weishu.exp",
         "com.saurik.substrate", "com.zachspong.temprootremovejb",
-        // Reverse engineering tools
         "com.mt.mtmanager", "bin.mt.plus",
         "com.apktool.apktools", "com.jrummyapps.rootbrowser",
         "com.noshufou.android.su", "com.koushikdutta.superuser",
-        // Game/App modifiers
-        "com.chelpus.lackypatch", "com.android.vending.billing.InAppBillingService.LACK",
+        "com.chelpus.lackypatch",
+        "com.android.vending.billing.InAppBillingService.LACK",
         "com.ramdroid.appquarantine",
-        // Frida
         "re.frida.server", "com.frida",
-        // Cloud phones & virtual environments
         "com.redfinger.app", "com.redfinger.cloud",
         "com.nowgg.cloud", "com.netease.mumu",
         "com.microvirt.memuime", "com.bignox.appcenter",
@@ -80,7 +78,6 @@ public class SecurityMonitor {
         "com.lbe.parallel.intl", "com.jumobile.smartapp.dual",
     };
     
-    // Cloud phone indicators in build properties
     private static final String[] CLOUD_PHONE_INDICATORS = {
         "vmos", "redfinger", "nowgg", "cloudphone", "remotegaming",
         "cloud_phone", "virtual_phone", "phonecloud", "genymotion",
@@ -96,12 +93,10 @@ public class SecurityMonitor {
 
     private SecurityMonitor(Context ctx) {
         this.context = ctx.getApplicationContext();
-        if (RELEASE_SIGNATURE_HASH != null) {
-            this.expectedSignatureHash = RELEASE_SIGNATURE_HASH;
-        } else {
-            this.expectedSignatureHash = getCurrentSignatureHash();
-        }
+        this.currentSignatureHash = getCurrentSignatureHash();
         this.expectedDexCount = countDexFiles();
+        // Start observing allowed signatures from Firebase
+        observeAllowedSignatures();
     }
     
     public static synchronized SecurityMonitor getInstance(Context ctx) {
@@ -110,29 +105,58 @@ public class SecurityMonitor {
         }
         return instance;
     }
-    
+
     /**
-     * Run initial security check (blocking, used during splash screen)
-     * Returns null if passed, or failure reason string
+     * Observe allowed signatures from Firebase Realtime Database
      */
+    private void observeAllowedSignatures() {
+        try {
+            FirebaseDatabase.getInstance()
+                .getReference("security/allowedSignatures")
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(DataSnapshot snapshot) {
+                        List<String> sigs = new ArrayList<>();
+                        if (snapshot.exists()) {
+                            for (DataSnapshot child : snapshot.getChildren()) {
+                                String hash = child.child("hash").getValue(String.class);
+                                if (hash != null && !hash.isEmpty()) {
+                                    sigs.add(hash.toLowerCase());
+                                }
+                            }
+                        }
+                        allowedSignatures = sigs;
+                        signaturesLoaded = true;
+                        Log.d(TAG, "Loaded " + sigs.size() + " allowed signatures");
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError error) {
+                        Log.e(TAG, "Failed to load signatures: " + error.getMessage());
+                        signaturesLoaded = true; // Don't block app
+                    }
+                });
+        } catch (Exception e) {
+            Log.e(TAG, "Error observing signatures", e);
+            signaturesLoaded = true;
+        }
+    }
+
+    public String getCurrentAppSignature() {
+        return currentSignatureHash;
+    }
+    
     public String runInitialCheck() {
         if (detectSniffers()) return "تم اكتشاف برنامج مراقبة";
         if (detectCloudPhone()) return "لا يمكن تشغيل التطبيق على هاتف سحابي";
         if (detectSecondaryDisplay()) return "لا يمكن تشغيل التطبيق على شاشة ثانوية";
-        // Emulator & Root allowed
-        // if (detectEmulator()) return "لا يمكن تشغيل التطبيق على محاكي";
         if (detectProxy()) return "تم اكتشاف بروكسي";
         if (detectDebugger()) return "تم اكتشاف مصحح أخطاء";
-        if (detectSignatureTampering()) return "تم التلاعب بالتطبيق";
         if (detectApkTampering()) return "تم تعديل ملفات التطبيق";
         if (detectFrida()) return "تم اكتشاف أداة اختراق";
-        // if (detectRootFiles()) return "الجهاز مروت";
-        return null; // All checks passed
+        return null;
     }
 
-    /**
-     * Run initial check asynchronously with callback
-     */
     public void runInitialCheckAsync(SecurityCheckCallback callback) {
         new Thread(() -> {
             String result = runInitialCheck();
@@ -152,17 +176,14 @@ public class SecurityMonitor {
                     if (detectSniffers()) { killApp(); return; }
                     if (detectCloudPhone()) { killApp(); return; }
                     if (detectSecondaryDisplay()) { killApp(); return; }
-                    // Emulator & Root allowed
-                    // if (detectEmulator()) { killApp(); return; }
                     if (detectProxy()) { killApp(); return; }
                     if (detectHostsModification()) { killApp(); return; }
                     if (detectUnauthorizedVPN()) { killApp(); return; }
-                    if (detectSignatureTampering()) { killApp(); return; }
+                    if (detectDynamicSignatureTampering()) { killApp(); return; }
                     if (detectPrivateDNS()) { killApp(); return; }
                     if (detectDebugger()) { killApp(); return; }
                     if (detectFrida()) { killApp(); return; }
                     if (detectApkTampering()) { killApp(); return; }
-                    // if (detectRootFiles()) { killApp(); return; }
                     
                     Thread.sleep(5 + (long)(Math.random() * 14));
                 } catch (InterruptedException e) {
@@ -203,7 +224,19 @@ public class SecurityMonitor {
         System.exit(0);
     }
     
-    // ======== CLOUD PHONE & VIRTUAL ENVIRONMENT DETECTION ========
+    // ======== DYNAMIC SIGNATURE VERIFICATION ========
+    
+    /**
+     * Check signature against Firebase-managed list.
+     * Only enforced if signatures have been loaded and list is non-empty.
+     */
+    private boolean detectDynamicSignatureTampering() {
+        if (!signaturesLoaded || allowedSignatures.isEmpty()) return false;
+        if (currentSignatureHash == null) return true;
+        return !allowedSignatures.contains(currentSignatureHash.toLowerCase());
+    }
+
+    // ======== CLOUD PHONE DETECTION ========
     
     private boolean detectCloudPhone() {
         String model = Build.MODEL.toLowerCase();
@@ -215,7 +248,6 @@ public class SecurityMonitor {
         String fingerprint = Build.FINGERPRINT.toLowerCase();
         String board = Build.BOARD.toLowerCase();
         
-        // Check all build properties against cloud phone indicators
         for (String indicator : CLOUD_PHONE_INDICATORS) {
             if (model.contains(indicator) || manufacturer.contains(indicator) ||
                 brand.contains(indicator) || product.contains(indicator) ||
@@ -225,14 +257,12 @@ public class SecurityMonitor {
             }
         }
         
-        // Check for VMOS specifically
         if (model.contains("vmos") || Build.DISPLAY.toLowerCase().contains("vmos") ||
             new File("/data/data/com.vmos.pro").exists() ||
             new File("/data/data/com.vmos.app").exists()) {
             return true;
         }
         
-        // Check for cloud phone files
         String[] cloudPhoneFiles = {
             "/data/data/com.redfinger.app",
             "/data/data/com.redfinger.cloud",
@@ -244,7 +274,6 @@ public class SecurityMonitor {
             if (new File(path).exists()) return true;
         }
         
-        // Check system properties for cloud indicators
         try {
             Process process = Runtime.getRuntime().exec("getprop");
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -263,27 +292,18 @@ public class SecurityMonitor {
         return false;
     }
     
-    /**
-     * Detect secondary/virtual displays (screen mirroring, dual screen apps)
-     */
     private boolean detectSecondaryDisplay() {
         try {
             DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
             if (dm != null) {
                 Display[] displays = dm.getDisplays();
-                // More than 1 display and any is not the default = suspicious
                 if (displays.length > 1) {
                     for (Display display : displays) {
                         if (display.getDisplayId() != Display.DEFAULT_DISPLAY) {
-                            // Check if it's a presentation display or virtual
                             int flags = display.getFlags();
                             boolean isVirtual = (flags & Display.FLAG_PRESENTATION) != 0;
                             boolean isPrivate = (flags & Display.FLAG_PRIVATE) != 0;
-                            
-                            // Virtual/presentation displays are suspicious
-                            if (isVirtual || isPrivate) {
-                                return true;
-                            }
+                            if (isVirtual || isPrivate) return true;
                         }
                     }
                 }
@@ -291,8 +311,6 @@ public class SecurityMonitor {
         } catch (Exception ignored) {}
         return false;
     }
-    
-    // ======== EXISTING DETECTION MODULES ========
     
     private boolean detectSniffers() {
         PackageManager pm = context.getPackageManager();
@@ -313,34 +331,6 @@ public class SecurityMonitor {
                 context.getContentResolver(), "http_proxy");
             if (globalProxy != null && !globalProxy.isEmpty() && !globalProxy.equals(":0")) return true;
         } catch (Exception ignored) {}
-        return false;
-    }
-    
-    private boolean detectEmulator() {
-        String model = Build.MODEL.toLowerCase();
-        String manufacturer = Build.MANUFACTURER.toLowerCase();
-        String brand = Build.BRAND.toLowerCase();
-        String device = Build.DEVICE.toLowerCase();
-        String product = Build.PRODUCT.toLowerCase();
-        String fingerprint = Build.FINGERPRINT.toLowerCase();
-        
-        if (model.contains("vmos") || manufacturer.contains("vmos") || 
-            product.contains("vmos") || brand.contains("vmos")) return true;
-        if (fingerprint.contains("generic") || fingerprint.contains("unknown") ||
-            fingerprint.contains("sdk") || fingerprint.contains("emulator") ||
-            fingerprint.contains("vbox")) {
-            if (model.contains("sdk") || model.contains("emulator") || 
-                model.contains("android sdk") || device.contains("generic")) return true;
-        }
-        if (model.contains("bluestacks") || manufacturer.contains("bluestacks")) return true;
-        if (model.contains("nox") || manufacturer.contains("nox") || brand.contains("nox")) return true;
-        if (model.contains("memu") || manufacturer.contains("microvirt")) return true;
-        if (model.contains("ldplayer") || manufacturer.contains("ldmnq")) return true;
-        
-        File qemuFile = new File("/dev/qemu_pipe");
-        File goldfish = new File("/sys/qemu_trace");
-        if (qemuFile.exists() || goldfish.exists()) return true;
-        
         return false;
     }
     
@@ -390,13 +380,6 @@ public class SecurityMonitor {
             }
         } catch (Exception ignored) {}
         return false;
-    }
-    
-    private boolean detectSignatureTampering() {
-        if (expectedSignatureHash == null) return false;
-        String currentHash = getCurrentSignatureHash();
-        if (currentHash == null) return true;
-        return !expectedSignatureHash.equals(currentHash);
     }
     
     @SuppressWarnings("deprecation")
@@ -452,16 +435,13 @@ public class SecurityMonitor {
     }
     
     private boolean detectDebugger() {
-        // Skip debugger check in debug builds (Android Studio testing)
         try {
             ApplicationInfo appInfo = context.getApplicationInfo();
             if ((appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
-                // Debug build - skip all debugger checks to allow testing
-                return false;
+                return false; // Debug build - allow testing
             }
         } catch (Exception ignored) {}
         
-        // Release build - full debugger detection
         if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) return true;
         try {
             BufferedReader reader = new BufferedReader(
@@ -519,24 +499,5 @@ public class SecurityMonitor {
             zipFile.close();
             return count;
         } catch (Exception e) { return -1; }
-    }
-    
-    private boolean detectRootFiles() {
-        String[] rootPaths = {
-            "/system/app/Superuser.apk", "/system/xbin/su", "/system/bin/su",
-            "/sbin/su", "/data/local/xbin/su", "/data/local/bin/su",
-            "/data/local/su", "/su/bin/su", "/system/bin/.ext/.su",
-        };
-        for (String path : rootPaths) {
-            if (new File(path).exists()) return true;
-        }
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{"which", "su"});
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String result = reader.readLine();
-            reader.close();
-            if (result != null && !result.isEmpty()) return true;
-        } catch (Exception ignored) {}
-        return false;
     }
 }
