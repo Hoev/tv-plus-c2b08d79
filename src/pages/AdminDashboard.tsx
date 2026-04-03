@@ -6,10 +6,11 @@ import ChannelManager from '@/components/admin/ChannelManager';
 import SideMenuManager from '@/components/admin/SideMenuManager';
 import NotificationManager from '@/components/admin/NotificationManager';
 import AdConfigManager from '@/components/admin/AdConfigManager';
+import SecurityConfigManager from '@/components/admin/SecurityConfigManager';
 import { Category } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, Settings, Tv, Menu, Folder, Shield, Bell, Megaphone } from 'lucide-react';
+import { LogOut, Settings, Tv, Menu, Folder, Shield, Bell, Megaphone, Lock } from 'lucide-react';
 
 // Update manifest for admin PWA
 const updateAdminManifest = () => {
