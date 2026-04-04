@@ -1,3 +1,4 @@
+
 name: Build Android App
 
 on:
@@ -28,13 +29,12 @@ jobs:
 
       - name: Build Debug APK
         working-directory: ./android
-        # تم إزالة tail -100 لكي يظهر الخطأ الحقيقي إن وُجد ولا يخدعنا بنجاح وهمي
-        run: gradle assembleDebug --stacktrace
+        # لاحظ هنا: استخدمنا gradle مباشرة بدلاً من ./gradlew المكسور
+        run: gradle assembleDebug --stacktrace 2>&1 | tail -100
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: APiX-App
-          
-          path: android/app/build/outputs/apk/**/*.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
