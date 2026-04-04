@@ -11,7 +11,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +41,7 @@ fun SettingsScreen(
                 .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
             Text(
-                text = "الإعدادات", // من الأفضل تعريبها بما أن الواجهة RTL
+                text = "SETTINGS",
                 color = Color.White,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold
@@ -49,14 +49,13 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Dark Mode toggle (تم جعل الصف بالكامل قابلاً للنقر)
+            // Dark Mode toggle
             SettingsRow(
-                title = "الوضع الداكن",
-                onClick = { onToggleDarkMode(!isDarkMode) },
+                title = "Dark Mode",
                 trailing = {
                     Switch(
                         checked = isDarkMode,
-                        onCheckedChange = null, // ألغينا النقر المباشر على الزر ليتحكم به الصف
+                        onCheckedChange = onToggleDarkMode,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Gold,
                             checkedTrackColor = Gold.copy(alpha = 0.5f),
@@ -71,15 +70,14 @@ fun SettingsScreen(
 
             // Telegram Channel
             SettingsRow(
-                title = "قناة التليجرام",
+                title = "Telegram Channel",
                 onClick = {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/apix_tv"))
                     context.startActivity(intent)
                 },
                 trailing = {
-                    // استخدمنا ArrowBack العادي لأنه في وضع RTL سيشير لليسار تلقائياً
                     Icon(
-                        Icons.Default.ArrowBack,
+                        Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = Gold
                     )
@@ -90,14 +88,14 @@ fun SettingsScreen(
 
             // Contact Us
             SettingsRow(
-                title = "تواصل معنا",
+                title = "Contact Us",
                 onClick = {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/apix_support"))
                     context.startActivity(intent)
                 },
                 trailing = {
                     Icon(
-                        Icons.Default.ArrowBack,
+                        Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = Gold
                     )
@@ -134,16 +132,16 @@ private fun SettingsRow(
             )
             .focusable(interactionSource = interactionSource)
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // تم تعديل الترتيب: النص أولاً، ثم مسافة مرنة، ثم الزر/الأيقونة
+        trailing()
+        Spacer(Modifier.width(16.dp))
         Text(
             text = title,
             color = Color.White,
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium
         )
-        Spacer(Modifier.weight(1f)) // هذا السطر يدفع الأيقونة إلى أقصى اليسار
-        trailing()
     }
 }
