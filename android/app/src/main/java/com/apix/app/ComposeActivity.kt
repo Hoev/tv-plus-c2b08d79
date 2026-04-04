@@ -110,7 +110,7 @@ fun AppNavigation(
 
     fun goBack(): Boolean {
         if (navigationStack.isNotEmpty()) {
-            currentScreen = navigationStack.removeLast()
+            currentScreen = navigationStack.removeAt(navigationStack.lastIndex)
             return true
         }
         return false
