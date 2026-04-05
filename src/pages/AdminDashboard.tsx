@@ -9,7 +9,10 @@ import AdConfigManager from '@/components/admin/AdConfigManager';
 import SecurityConfigManager from '@/components/admin/SecurityConfigManager';
 import { Category } from '@/types/admin';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { db } from '@/lib/firebase';
+import { onValue, ref, set } from 'firebase/database';
 import { LogOut, Settings, Tv, Menu, Folder, Shield, Bell, Megaphone, Lock } from 'lucide-react';
 
 // Update manifest for admin PWA
@@ -23,6 +26,8 @@ const updateAdminManifest = () => {
 const AdminDashboard: React.FC = () => {
   const { user, loading, isAuthorized, logout } = useAdminAuth();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [showSettingsSection, setShowSettingsSection] = useState(true);
+  const [settingsConfigLoaded, setSettingsConfigLoaded] = useState(false);
 
   // Set admin manifest for PWA
   useEffect(() => {
@@ -30,6 +35,22 @@ const AdminDashboard: React.FC = () => {
     // Update document title for admin
     document.title = 'TV Control - لوحة التحكم';
   }, []);
+
+  useEffect(() => {
+    const settingsRef = ref(db, 'appSettings');
+    const unsubscribe = onValue(settingsRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setShowSettingsSection(data.showSettingsSection !== false);
+      setSettingsConfigLoaded(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSettingsSectionToggle = async (checked: boolean) => {
+    setShowSettingsSection(checked);
+    await set(ref(db, 'appSettings/showSettingsSection'), checked);
+  };
 
   if (loading) {
     return (
@@ -152,6 +173,19 @@ const AdminDashboard: React.FC = () => {
                 <h3 className="text-lg font-bold text-foreground">إعدادات المشرف</h3>
                 
                 <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4 py-3 border-b border-border">
+                    <div>
+                      <p className="text-foreground font-medium">إظهار قسم الإعدادات داخل التطبيق</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        يظهر قسم الإعدادات دائمًا كآخر عنصر بعد جميع الأقسام الجديدة.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={showSettingsSection}
+                      disabled={!settingsConfigLoaded}
+                      onCheckedChange={handleSettingsSectionToggle}
+                    />
+                  </div>
                   <div className="flex items-center justify-between py-3 border-b border-border">
                     <span className="text-muted-foreground">مسجل الدخول كـ</span>
                     <span className="text-foreground font-medium">{user.email}</span>
