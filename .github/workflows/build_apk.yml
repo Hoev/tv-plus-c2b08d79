@@ -20,20 +20,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # هذه الخطوة الجديدة تقوم بتجهيز Gradle مباشرة
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.5'
 
       - name: Build Debug APK
         working-directory: ./android
-        # لاحظ هنا: استخدمنا gradle مباشرة بدلاً من ./gradlew المكسور
-        run: gradle assembleDebug --stacktrace 2>&1 | tail -100
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleDebug --stacktrace --console=plain | tee build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: APiX-App
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 30
