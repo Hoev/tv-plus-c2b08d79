@@ -79,6 +79,8 @@ sealed class Screen {
     data class Player(val config: PlayerConfig) : Screen()
 }
 
+private const val SETTINGS_CATEGORY_ID = "__settings"
+
 @Composable
 fun AppNavigation(
     isDarkMode: Boolean,
@@ -93,6 +95,12 @@ fun AppNavigation(
     val navigationStack = remember { mutableStateListOf<Screen>() }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
     var isSettings by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.showSettingsSection) {
+        if (!uiState.showSettingsSection && isSettings) {
+            isSettings = false
+        }
+    }
 
     // Notify activity about player state
     LaunchedEffect(currentScreen) {
@@ -149,8 +157,7 @@ fun AppNavigation(
     }
 
     fun handleCategorySelect(cat: Category) {
-        val lower = cat.name.lowercase()
-        if (lower.contains("setting") || lower.contains("إعدادات")) {
+        if (cat.id == SETTINGS_CATEGORY_ID) {
             isSettings = true
         } else {
             isSettings = false

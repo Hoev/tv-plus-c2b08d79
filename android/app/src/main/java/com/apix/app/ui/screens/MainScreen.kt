@@ -47,6 +47,15 @@ fun MainScreen(
     channels: List<Channel>,
     modifier: Modifier = Modifier
 ) {
+    val displayCategories = remember(uiState.categories, uiState.showSettingsSection) {
+        buildList {
+            addAll(uiState.categories)
+            if (uiState.showSettingsSection) {
+                add(Category(id = "__settings", name = "الإعدادات", sortOrder = Int.MAX_VALUE))
+            }
+        }
+    }
+
     // Force RTL
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         if (uiState.isLoading) {
@@ -72,6 +81,7 @@ fun MainScreen(
         if (isLandscape) {
             LandscapeLayout(
                 uiState = uiState,
+                categories = displayCategories,
                 channels = channels,
                 onCategorySelected = onCategorySelected,
                 onChannelClick = onChannelClick,
@@ -80,6 +90,7 @@ fun MainScreen(
         } else {
             PortraitLayout(
                 uiState = uiState,
+                categories = displayCategories,
                 channels = channels,
                 onCategorySelected = onCategorySelected,
                 onChannelClick = onChannelClick,
@@ -92,12 +103,13 @@ fun MainScreen(
 @Composable
 private fun PortraitLayout(
     uiState: UiState,
+    categories: List<Category>,
     channels: List<Channel>,
     onCategorySelected: (Category) -> Unit,
     onChannelClick: (Channel) -> Unit,
     onSearchClick: () -> Unit
 ) {
-    val selectedIndex = uiState.categories.indexOf(uiState.selectedCategory)
+    val selectedIndex = categories.indexOfFirst { it.id == uiState.selectedCategory?.id }
 
     Column(
         modifier = Modifier
@@ -154,7 +166,7 @@ private fun PortraitLayout(
                 .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            uiState.categories.forEachIndexed { index, cat ->
+            categories.forEachIndexed { index, cat ->
                 BottomNavCategoryItem(
                     category = cat,
                     isSelected = index == selectedIndex,
@@ -169,12 +181,13 @@ private fun PortraitLayout(
 @Composable
 private fun LandscapeLayout(
     uiState: UiState,
+    categories: List<Category>,
     channels: List<Channel>,
     onCategorySelected: (Category) -> Unit,
     onChannelClick: (Channel) -> Unit,
     onSearchClick: () -> Unit
 ) {
-    val selectedIndex = uiState.categories.indexOf(uiState.selectedCategory)
+    val selectedIndex = categories.indexOfFirst { it.id == uiState.selectedCategory?.id }
 
     // Force LTR for layout positioning, then RTL content inside
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -281,8 +294,8 @@ private fun LandscapeLayout(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(uiState.categories) { cat ->
-                            val idx = uiState.categories.indexOf(cat)
+                        items(categories) { cat ->
+                            val idx = categories.indexOf(cat)
                             SidebarCategoryItem(
                                 category = cat,
                                 isSelected = idx == selectedIndex,

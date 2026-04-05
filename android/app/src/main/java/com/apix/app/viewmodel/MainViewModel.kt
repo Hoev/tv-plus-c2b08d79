@@ -33,7 +33,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             launch {
                 FirebaseRepository.observeCategories().collect { cats ->
                     _uiState.update { state ->
-                        val selected = state.selectedCategory
+                        val selected = cats.firstOrNull { it.id == state.selectedCategory?.id }
                             ?: cats.firstOrNull()
                         state.copy(
                             categories = cats,
@@ -49,6 +49,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             launch {
                 FirebaseRepository.observeSideMenus().collect { menus ->
                     _sideMenus.value = menus
+                }
+            }
+
+            launch {
+                FirebaseRepository.observeAppSettings().collect { settings ->
+                    _uiState.update { state ->
+                        state.copy(showSettingsSection = settings.showSettingsSection)
+                    }
                 }
             }
         }
@@ -156,5 +164,6 @@ data class UiState(
     val categories: List<Category> = emptyList(),
     val selectedCategory: Category? = null,
     val isLoading: Boolean = true,
-    val error: String? = null
+    val error: String? = null,
+    val showSettingsSection: Boolean = true
 )

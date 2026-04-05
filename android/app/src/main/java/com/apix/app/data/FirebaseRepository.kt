@@ -12,6 +12,14 @@ object FirebaseRepository {
 
     private const val TAG = "FirebaseRepo"
 
+    private fun isSettingsCategory(name: String): Boolean {
+        val normalized = name.trim().lowercase()
+        return normalized == "settings" ||
+            normalized == "setting" ||
+            normalized == "الإعدادات" ||
+            normalized == "اعدادات"
+    }
+
     suspend fun ensureAnonymousAuth() {
         val auth = FirebaseAuth.getInstance()
         if (auth.currentUser == null) {
@@ -34,7 +42,7 @@ object FirebaseRepository {
                     try {
                         val cat = child.getValue(Category::class.java) ?: continue
                         cat.id = child.key ?: continue
-                        if (cat.hidden) continue
+                        if (cat.hidden || isSettingsCategory(cat.name)) continue
 
                         val channelsMap = mutableMapOf<String, Channel>()
                         for (chSnap in child.child("channels").children) {
@@ -55,6 +63,22 @@ object FirebaseRepository {
             override fun onCancelled(error: DatabaseError) {
                 Log.e(TAG, "Categories cancelled: ${error.message}")
                 close(error.toException())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    fun observeAppSettings(): Flow<AppSettings> = callbackFlow {
+        val ref = FirebaseDatabase.getInstance().getReference("appSettings")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val settings = snapshot.getValue(AppSettings::class.java) ?: AppSettings()
+                trySend(settings)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "AppSettings cancelled: ${error.message}")
             }
         }
         ref.addValueEventListener(listener)

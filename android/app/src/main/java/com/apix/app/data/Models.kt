@@ -74,6 +74,13 @@ data class SideMenu(
 )
 
 @IgnoreExtraProperties
+data class AppSettings(
+    @get:PropertyName("showSettingsSection")
+    @set:PropertyName("showSettingsSection")
+    var showSettingsSection: Boolean = true
+)
+
+@IgnoreExtraProperties
 data class SubChannel(
     var id: String = "",
     var name: String = "",
