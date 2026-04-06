@@ -17,7 +17,7 @@ import com.apix.app.ui.theme.APiXTheme
 import com.apix.app.viewmodel.MainViewModel
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
-import com.google.gson.Gson
+
 
 class ComposeActivity : ComponentActivity() {
 
