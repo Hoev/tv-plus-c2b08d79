@@ -8,7 +8,7 @@ export type iOSPlayerApp = 'vlc' | 'outplayer' | 'infuse' | 'kmplayer';
 
 export interface iOSPlayerConfig {
   app: iOSPlayerApp;
-  fallbackToWeb?: boolean; // If app not installed, play in secure player
+  fallbackToWeb?: boolean;
 }
 
 // Android-specific action types
@@ -19,11 +19,14 @@ export type DrmScheme = 'widevine' | 'clearkey' | 'playready';
 
 export type ClearKeyMode = 'separate' | 'combined' | 'url';
 
+// Aspect ratio modes for forced display
+export type AspectRatioMode = 'original' | 'fit' | 'stretch' | '16:9' | '4:3';
+
 export interface DRMConfig {
   clearKeyId?: string;
   clearKeyKey?: string;
-  clearKeyCombined?: string; // Format: "KeyID:Key"
-  clearKeyUrl?: string; // URL that returns keys
+  clearKeyCombined?: string;
+  clearKeyUrl?: string;
   clearKeyMode?: ClearKeyMode;
 }
 
@@ -33,6 +36,38 @@ export interface StreamHeaders {
   referrer?: string;
   cookie?: string;
   origin?: string;
+}
+
+// Custom header entry (Key:Value pair)
+export interface CustomHeader {
+  key: string;
+  value: string;
+}
+
+// External audio source
+export interface AudioSource {
+  name: string;
+  url: string;
+}
+
+// Logo overlay configuration
+export interface LogoOverlay {
+  url: string;
+  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  offsetX?: number;
+  offsetY?: number;
+  width?: number;
+  height?: number;
+  opacity?: number;
+}
+
+// Dynamic API fetching configuration
+export interface DynamicApiConfig {
+  enabled: boolean;
+  endpoint: string;
+  method: 'GET' | 'POST';
+  channelIdParam?: string;
+  headers?: Record<string, string>;
 }
 
 export interface StreamConfig {
@@ -54,14 +89,23 @@ export interface WebStreamConfig {
 export interface AndroidStreamConfig {
   url: string;
   headers?: StreamHeaders;
-  intentUri?: string; // For launching external apps
+  customHeaders?: CustomHeader[];
+  intentUri?: string;
   drmLicenseUrl?: string;
   drmScheme?: DrmScheme;
-  drmKeyId?: string; // ClearKey Key ID
-  drmKey?: string; // ClearKey Key
-  drmClearKeyCombined?: string; // Combined format: KeyID:Key
-  drmClearKeyMode?: ClearKeyMode; // Which input mode is used
-  servers?: Array<{ name: string; url: string }>; // Multi-server support
+  drmKeyId?: string;
+  drmKey?: string;
+  drmClearKeyCombined?: string;
+  drmClearKeyMode?: ClearKeyMode;
+  drmLicenseHeaders?: CustomHeader[];
+  servers?: Array<{ name: string; url: string }>;
+  backupUrl?: string;
+  audioSources?: AudioSource[];
+  subtitleUrl?: string;
+  dynamicApi?: DynamicApiConfig;
+  forcedAspectRatio?: AspectRatioMode;
+  lockAspectRatio?: boolean;
+  logoOverlay?: LogoOverlay;
 }
 
 export interface SubChannel {
@@ -82,7 +126,6 @@ export interface SubChannel {
 export interface SideMenu {
   id: string;
   name: string;
-  // Stored in Realtime Database as an object keyed by channel id
   channels: Record<string, SubChannel>;
 }
 
@@ -112,7 +155,7 @@ export interface Category {
   sortOrder: number;
   channels: Record<string, Channel>;
   hidden?: boolean;
-  adGateEnabled?: boolean; // Require watching ad before accessing this section
+  adGateEnabled?: boolean;
 }
 
 // AdMob configuration stored in Firebase

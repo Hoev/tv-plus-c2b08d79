@@ -29,7 +29,17 @@ jobs:
         run: |
           set -o pipefail
           chmod +x ./gradlew
-          ./gradlew --no-daemon assembleDebug --stacktrace --console=plain | tee build.log
+          ./gradlew --no-daemon assembleDebug --stacktrace --console=plain 2>&1 | tee build.log
+          echo "=== BUILD COMPLETED ==="
+
+      - name: Show errors on failure
+        if: failure()
+        working-directory: ./android
+        run: |
+          echo "=== COMPILATION ERRORS ==="
+          grep -i "error:" build.log | head -50 || true
+          echo "=== LAST 80 LINES ==="
+          tail -80 build.log || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
